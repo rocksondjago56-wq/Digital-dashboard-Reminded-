@@ -1,5 +1,5 @@
 import React, { useContext, useState } from 'react';
-import { DbContext } from '../context/DbContext';
+import { DbContext } from '../context/DbContextDefinition';
 import './AdminDashboard.css';
 
 export default function AdminDashboard() {

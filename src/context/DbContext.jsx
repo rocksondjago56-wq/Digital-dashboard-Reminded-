@@ -1,6 +1,5 @@
-import React, { createContext, useState, useEffect } from 'react';
-
-export const DbContext = createContext();
+import React, { useState, useEffect } from 'react';
+import { DbContext } from './DbContextDefinition';
 
 // Mock Initial Data
 const initialUsers = [

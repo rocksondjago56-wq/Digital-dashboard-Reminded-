@@ -1,5 +1,5 @@
 import React, { useContext, useState, useRef, useEffect } from 'react';
-import { DbContext } from '../context/DbContext';
+import { DbContext } from '../context/DbContextDefinition';
 import './Navbar.css';
 import ttuLogo from '../ttu-logo.png.png';
 

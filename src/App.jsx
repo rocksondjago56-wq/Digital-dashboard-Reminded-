@@ -1,5 +1,5 @@
 import React, { useContext } from 'react';
-import { DbContext } from './context/DbContext';
+import { DbContext } from './context/DbContextDefinition';
 import Login from './components/Login';
 import Navbar from './components/Navbar';
 import StudentDashboard from './components/StudentDashboard';

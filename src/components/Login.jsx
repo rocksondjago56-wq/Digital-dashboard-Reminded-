@@ -1,5 +1,5 @@
 import React, { useState, useContext } from 'react';
-import { DbContext } from '../context/DbContext';
+import { DbContext } from '../context/DbContextDefinition';
 import './Login.css';
 import ttuLogo from '../ttu-logo.png.png';
 
@@ -15,7 +15,7 @@ export default function Login() {
   // Sign Up State
   const [regName, setRegName] = useState('');
   const [regEmail, setRegEmail] = useState('');
-  const [regIndexNumber, setRegIndexNumber] = useState('');
+  const regIndexNumber = '';
   const [regPassword, setRegPassword] = useState('');
   const [regRole, setRegRole] = useState('student');
   const [regYear, setRegYear] = useState('Year 1');

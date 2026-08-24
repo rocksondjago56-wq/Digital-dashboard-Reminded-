@@ -1,5 +1,5 @@
 import React, { useContext, useState, useRef } from 'react';
-import { DbContext } from '../context/DbContext';
+import { DbContext } from '../context/DbContextDefinition';
 import './StudentDashboard.css';
 
 export default function StudentDashboard() {
