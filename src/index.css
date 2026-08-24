@@ -123,8 +123,8 @@ a:hover {
 }
 
 .glass-panel:hover {
-  background: var(--bg-card);
   border-color: #cbd5e1;
+  box-shadow: 0 14px 32px -8px rgba(0, 51, 102, 0.18), 0 0 0 3px rgba(2, 132, 199, 0.08);
 }
 
 /* Forms & Inputs */
