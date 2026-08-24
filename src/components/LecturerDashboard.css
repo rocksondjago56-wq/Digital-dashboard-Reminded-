@@ -1,0 +1,269 @@
+.lecturer-hero {
+  border-left-color: var(--accent-cyan);
+  background: linear-gradient(135deg, #004085, #0284c7);
+  color: #ffffff;
+}
+
+.hero-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.lecturer-courses-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.course-pill {
+  font-size: 0.8rem;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  padding: 4px 12px;
+  border-radius: 20px;
+  color: #ffffff;
+}
+
+/* Forms Drawers */
+.lecturer-forms-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+}
+
+@media (min-width: 1024px) {
+  .lecturer-forms-row:has(> :nth-child(2)) {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.form-card {
+  padding: 24px;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.form-card h2 {
+  font-size: 1.25rem;
+  border-bottom: 1px solid var(--border-light);
+  padding-bottom: 12px;
+  margin-bottom: 16px;
+  color: #0f172a;
+}
+
+.dashboard-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.form-row-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 580px) {
+  .form-row-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.checkbox-form-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-top: 28px;
+}
+
+@media (max-width: 580px) {
+  .checkbox-form-group {
+    padding-top: 0;
+  }
+}
+
+.checkbox-form-group input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+}
+
+.inline-label {
+  display: inline;
+  margin-bottom: 0;
+  cursor: pointer;
+}
+
+.form-button-group {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+/* Lecturer lists styling */
+.section-header-simple {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border-light);
+  padding-bottom: 16px;
+  margin-bottom: 24px;
+}
+
+.count-tag {
+  font-size: 0.8rem;
+  background: #e2e8f0;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.lecturer-deadlines-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.lecturer-item-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  background: #ffffff;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  padding: 20px;
+  transition: var(--transition-smooth);
+}
+
+.lecturer-item-card:hover {
+  background: #ffffff;
+  border-color: #cbd5e1;
+  box-shadow: 0 4px 15px rgba(0, 51, 102, 0.08);
+}
+
+.item-card-body {
+  flex: 1;
+}
+
+.item-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.course-name {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--ttu-blue-vibrant);
+  text-transform: uppercase;
+}
+
+.lecturer-item-card h3 {
+  font-size: 1.15rem;
+  margin-bottom: 6px;
+  color: #0f172a;
+}
+
+.lecturer-item-card p {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.date-info {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.btn-icon-danger {
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  color: #dc2626;
+  padding: 6px 14px;
+  font-size: 0.85rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-weight: 600;
+  transition: var(--transition-smooth);
+  white-space: nowrap;
+}
+
+.btn-icon-danger:hover {
+  background: var(--danger);
+  color: #fff;
+  border-color: var(--danger);
+}
+
+/* Sidebar lecturer announcements */
+.lecturer-announcements-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.lecturer-ann-card {
+  padding: 12px;
+  background: #f8fafc;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+}
+
+.ann-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.ann-date {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.btn-text-danger {
+  background: none;
+  border: none;
+  color: #dc2626;
+  font-size: 0.75rem;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.btn-text-danger:hover {
+  text-decoration: underline;
+}
+
+.lecturer-ann-card h3 {
+  font-size: 0.95rem;
+  margin-bottom: 4px;
+  color: #0f172a;
+}
+
+.lecturer-ann-card p {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+@media (max-width: 768px) {
+  .lecturer-item-card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  
+  .item-card-actions {
+    width: 100%;
+    display: flex;
+    justify-content: flex-end;
+  }
+}

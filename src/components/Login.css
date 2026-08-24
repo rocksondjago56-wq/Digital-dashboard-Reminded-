@@ -1,0 +1,116 @@
+.login-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  padding: 40px 20px;
+  width: 100%;
+  background:
+    linear-gradient(rgba(15, 23, 42, 0.68), rgba(15, 23, 42, 0.68)),
+    url('../IMG_6849-background-rotated.jpg') center / cover no-repeat;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 480px;
+  padding: 40px;
+  border-radius: var(--radius-lg);
+  position: relative;
+  overflow: hidden;
+  background: #ffffff;
+  box-shadow: 0 20px 45px rgba(0, 40, 100, 0.18);
+  border: 1px solid var(--border-light);
+}
+
+.login-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.ttu-logo-sim {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 20px;
+  background: #ffffff;
+  padding: 12px 20px;
+  border-radius: var(--radius-sm);
+  box-shadow: 0 4px 14px rgba(0, 51, 102, 0.08);
+  border: 1px solid #e2e8f0;
+}
+
+.ttu-logo-img {
+  width: 100%;
+  max-width: 280px;
+  height: auto;
+  object-fit: contain;
+}
+
+.login-card h1 {
+  font-size: 1.8rem;
+  margin-bottom: 6px;
+  color: #0f172a;
+}
+
+.subtitle {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+}
+
+.login-error-alert {
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  margin-bottom: 24px;
+  color: #dc2626;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+}
+
+.login-form .form-group {
+  margin-bottom: 20px;
+}
+
+.w-full {
+  width: 100%;
+}
+
+.login-footer {
+  text-align: center;
+  margin-top: 35px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border-light);
+  padding-top: 16px;
+}
+
+.login-footer p:first-child {
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.switch-mode-text {
+  text-align: center;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.switch-mode-link {
+  color: var(--ttu-blue-vibrant);
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+  transition: var(--transition-smooth);
+}
+
+.switch-mode-link:hover {
+  color: var(--ttu-blue);
+}
+
+@media (max-width: 560px) {
+  .login-card {
+    padding: 24px;
+  }
+}
