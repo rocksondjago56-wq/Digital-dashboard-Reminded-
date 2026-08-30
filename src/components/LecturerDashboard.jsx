@@ -1,6 +1,11 @@
 import React, { useContext, useState } from 'react';
 import { DbContext } from '../context/DbContextDefinition';
 import './LecturerDashboard.css';
+import {
+  openWhatsApp,
+  formatAnnouncementForWhatsApp,
+  formatDeadlineForWhatsApp
+} from '../utils/whatsapp';
 
 export default function LecturerDashboard() {
   const { 
@@ -24,6 +29,8 @@ export default function LecturerDashboard() {
   const [dlCourse, setDlCourse] = useState(currentUser.courses?.[0] || 'General Graphic Design');
   const [dlDate, setDlDate] = useState('');
   const [dlType, setDlType] = useState('assignment');
+  const [dlAttachment, setDlAttachment] = useState(null);
+  const [attachmentError, setAttachmentError] = useState('');
 
   // Announcement Fields
   const [annTitle, setAnnTitle] = useState('');
@@ -41,6 +48,7 @@ export default function LecturerDashboard() {
       course: dlCourse,
       dueDate: dlDate,
       type: dlType,
+      attachment: dlAttachment,
       author: currentUser.name,
       authorRole: 'lecturer'
     });
@@ -49,7 +57,37 @@ export default function LecturerDashboard() {
     setDlTitle('');
     setDlDesc('');
     setDlDate('');
+    setDlAttachment(null);
+    setAttachmentError('');
     setShowDeadlineForm(false);
+  };
+
+  const handleDeadlineAttachment = (e) => {
+    const file = e.target.files?.[0];
+    setAttachmentError('');
+
+    if (!file) {
+      setDlAttachment(null);
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setDlAttachment(null);
+      setAttachmentError('Please choose a file smaller than 5 MB.');
+      e.target.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setDlAttachment({
+        name: file.name,
+        type: file.type || 'application/octet-stream',
+        size: (file.size / 1024).toFixed(1) + ' KB',
+        dataUrl: reader.result
+      });
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleCreateAnnouncement = (e) => {
@@ -84,8 +122,8 @@ export default function LecturerDashboard() {
       {/* Lecturer Portal Hero */}
       <header className="dashboard-hero glass-panel lecturer-hero">
         <div className="hero-text">
-          <h1>Lecturer Console</h1>
-          <p>Logged in as <strong>{currentUser.name}</strong>. Manage deadlines, assignments, and bulletins for your design courses.</p>
+          <h1>{currentUser?.name || 'Lecturer Dashboard'}</h1>
+          <p>Signed in as <strong>{currentUser.name}</strong>. Manage course deadlines, upload assignment briefs, and publish notices for your students.</p>
           <div className="lecturer-courses-pills mt-2">
             {lecturerCourses.map((c, i) => (
               <span key={i} className="course-pill">📘 {c}</span>
@@ -94,7 +132,7 @@ export default function LecturerDashboard() {
         </div>
         <div className="hero-actions">
           <button onClick={() => setShowDeadlineForm(!showDeadlineForm)} className="btn btn-primary">
-            {showDeadlineForm ? 'Close Portal' : '➕ Create Deadline'}
+            {showDeadlineForm ? 'Close Deadline Form' : 'Upload Course Deadline'}
           </button>
           <button onClick={() => setShowAnnounceForm(!showAnnounceForm)} className="btn btn-accent">
             {showAnnounceForm ? 'Close Portal' : '📢 Post Notice'}
@@ -106,7 +144,7 @@ export default function LecturerDashboard() {
       <div className="lecturer-forms-row mt-2">
         {showDeadlineForm && (
           <div className="glass-panel form-card animate-fade-in">
-            <h2>Add New Academic Deadline</h2>
+            <h2>Upload Course Deadline & Assignment Brief</h2>
             <form onSubmit={handleCreateDeadline} className="dashboard-form">
               <div className="form-group">
                 <label>Assignment / Exam Title</label>
@@ -146,14 +184,32 @@ export default function LecturerDashboard() {
                 />
               </div>
               <div className="form-group">
-                <label>Submission Instructions / Brief</label>
+                <label>Submission Instructions / Brief Notes</label>
                 <textarea 
                   rows="3" 
-                  placeholder="Provide submission specifications, PDF requirements, file size bounds..."
+                  placeholder="Provide submission specifications, required software, format instructions..."
                   value={dlDesc} 
                   onChange={(e) => setDlDesc(e.target.value)} 
                   required
                 ></textarea>
+              </div>
+              <div className="form-group">
+                <label htmlFor="deadline-attachment">Upload Assignment Document / Notes (PDF, DOCX, ZIP, Images)</label>
+                <input
+                  id="deadline-attachment"
+                  type="file"
+                  accept=".pdf,.doc,.docx,.ppt,.pptx,.txt,.rtf,.zip,.png,.jpg,.jpeg"
+                  onChange={handleDeadlineAttachment}
+                />
+                <small className="form-help-text">
+                  Students will be able to view and download this assignment document / brief (Max: 5 MB).
+                </small>
+                {dlAttachment && (
+                  <p className="attachment-selected" style={{ color: '#25D366', fontWeight: 600, marginTop: '6px' }}>
+                    📎 Attached: {dlAttachment.name} ({dlAttachment.size})
+                  </p>
+                )}
+                {attachmentError && <p className="form-error-text" style={{ color: '#ef4444' }}>⚠️ {attachmentError}</p>}
               </div>
               <div className="form-button-group">
                 <button type="submit" className="btn btn-primary">Publish to Students</button>
@@ -247,11 +303,54 @@ export default function LecturerDashboard() {
                       </div>
                       <h3>{d.title}</h3>
                       <p>{d.description}</p>
+                      {d.attachment?.dataUrl && (
+                        <div style={{ marginTop: '8px' }}>
+                          <a
+                            href={d.attachment.dataUrl}
+                            download={d.attachment.name}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              background: 'rgba(37, 99, 235, 0.12)',
+                              border: '1px solid rgba(37, 99, 235, 0.3)',
+                              color: '#2563eb',
+                              padding: '4px 10px',
+                              borderRadius: '6px',
+                              fontSize: '11.5px',
+                              fontWeight: 600,
+                              textDecoration: 'none'
+                            }}
+                          >
+                            📄 Uploaded Brief: {d.attachment.name} 📥
+                          </a>
+                        </div>
+                      )}
                       <div className="date-info mt-2">
                         <span>📅 Due: <strong>{d.dueDate}</strong></span>
                       </div>
                     </div>
-                    <div className="item-card-actions">
+                    <div className="item-card-actions" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <button
+                        type="button"
+                        onClick={() => openWhatsApp({ text: formatDeadlineForWhatsApp(d) })}
+                        style={{
+                          background: 'rgba(37, 211, 102, 0.12)',
+                          border: '1px solid rgba(37, 211, 102, 0.35)',
+                          color: '#16a34a',
+                          padding: '6px 12px',
+                          borderRadius: '6px',
+                          fontSize: '11px',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}
+                        title="Broadcast deadline directly to student class WhatsApp group"
+                      >
+                        📲 WhatsApp Blast
+                      </button>
                       <button 
                         onClick={() => deleteDeadline(d.id)} 
                         className="btn-icon-danger"
@@ -281,7 +380,24 @@ export default function LecturerDashboard() {
                   <div key={a.id} className="lecturer-ann-card">
                     <div className="ann-card-header">
                       <span className="ann-date">{a.date}</span>
-                      <button onClick={() => deleteAnnouncement(a.id)} className="btn-text-danger">🗑️ Remove</button>
+                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                        <button
+                          type="button"
+                          onClick={() => openWhatsApp({ text: formatAnnouncementForWhatsApp(a) })}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#25D366',
+                            fontSize: '11px',
+                            fontWeight: '600',
+                            cursor: 'pointer'
+                          }}
+                          title="Share to WhatsApp"
+                        >
+                          📲 Share
+                        </button>
+                        <button onClick={() => deleteAnnouncement(a.id)} className="btn-text-danger">🗑️ Remove</button>
+                      </div>
                     </div>
                     <h3>{a.title} {a.isPinned && '📌'}</h3>
                     <p>{a.content}</p>

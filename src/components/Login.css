@@ -110,7 +110,36 @@
 }
 
 @media (max-width: 560px) {
+  .login-container {
+    align-items: flex-start;
+    padding: 16px 12px;
+  }
+
   .login-card {
     padding: 24px;
+    border-radius: var(--radius-md);
+  }
+
+  .ttu-logo-sim {
+    padding: 10px;
+    margin-bottom: 16px;
+  }
+
+  .login-header {
+    margin-bottom: 22px;
+  }
+
+  .login-footer {
+    margin-top: 24px;
+  }
+}
+
+@media (max-width: 360px) {
+  .login-card {
+    padding: 18px;
+  }
+
+  .login-card h1 {
+    font-size: 1.5rem;
   }
 }

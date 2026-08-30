@@ -1,6 +1,16 @@
-import React, { useContext, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { DbContext } from '../context/DbContextDefinition';
 import './StudentDashboard.css';
+import {
+  openWhatsApp,
+  formatAnnouncementForWhatsApp,
+  formatDeadlineForWhatsApp,
+  formatEventForWhatsApp,
+  createClassGroupTitle,
+  formatClassGroupJoinRequest
+} from '../utils/whatsapp';
+
+const CLASS_YEAR_OPTIONS = ['Year 1', 'Year 2', 'Year 3', 'Year 4'];
 
 export default function StudentDashboard() {
   const {
@@ -8,20 +18,54 @@ export default function StudentDashboard() {
     deadlines,
     events,
     announcements,
-    toggleDeadlineCompleted
+    toggleDeadlineCompleted,
+    timetable,
+    classGroups,
+    addTimetableSlot,
+    updateTimetableSlot,
+    deleteTimetableSlot,
+    saveClassWhatsAppGroup
   } = useContext(DbContext);
 
   const [activeTab, setActiveTab] = useState('all'); // all, assignments, projects, exams, completed
   const [announcementFilter, setAnnouncementFilter] = useState('all'); // all, notice, update, calendar
+  const [showTimetableForm, setShowTimetableForm] = useState(false);
+  const [editingTimetableId, setEditingTimetableId] = useState(null);
+  const [timetableForm, setTimetableForm] = useState({
+    day: 'Monday',
+    time: '',
+    course: '',
+    room: '',
+    year: 'All Years'
+  });
+  const [classGroupYear, setClassGroupYear] = useState(currentUser?.year || 'Year 1');
+  const [classHeadPhone, setClassHeadPhone] = useState('');
+  const [classInviteLink, setClassInviteLink] = useState('');
+  const [classGroupStatus, setClassGroupStatus] = useState('');
 
-  // Personalized Student timetable schedule
-  const studentTimetable = [
-    { day: 'Monday', time: '08:30 AM - 11:30 AM', course: 'Layout Design II', room: 'Lab 3 (Mac Lab)' },
-    { day: 'Tuesday', time: '01:00 PM - 03:00 PM', course: 'Art History & Theory', room: 'Lecture Hall C' },
-    { day: 'Wednesday', time: '10:00 AM - 01:00 PM', course: 'Vector Graphics I', room: 'Lab 1' },
-    { day: 'Thursday', tlinkime: '08:30 AM - 10:30 AM', course: 'Visual Portfolio Prep', room: 'Studio B' },
-    { day: 'Friday', time: '02:00 PM - 04:00 PM', course: 'Design Workshop Seminar', room: 'Auditorium' }
-  ];
+  const canManageTimetable = currentUser.role === 'student_head';
+  const canManageClassGroup = currentUser.role === 'student_head';
+  const classGroupForForm = (classGroups || []).find(group => group.year === classGroupYear);
+  const currentStudentClassGroup = (classGroups || []).find(group => group.year === currentUser?.year);
+  const generatedClassTitle = createClassGroupTitle(classGroupYear);
+  const visibleTimetable = (timetable || []).filter(slot => (
+    canManageTimetable ||
+    !slot.year ||
+    slot.year === 'All Years' ||
+    slot.year === currentUser.year
+  ));
+
+  useEffect(() => {
+    if (canManageClassGroup && currentUser?.year) {
+      setClassGroupYear(currentUser.year);
+    }
+  }, [canManageClassGroup, currentUser?.id, currentUser?.year]);
+
+  useEffect(() => {
+    if (!canManageClassGroup) return;
+    setClassHeadPhone(classGroupForForm?.headPhone || '');
+    setClassInviteLink(classGroupForForm?.inviteLink || '');
+  }, [canManageClassGroup, classGroupForForm]);
 
   // Helper for computing days remaining
   const getDaysRemaining = (dueDateStr) => {
@@ -38,9 +82,10 @@ export default function StudentDashboard() {
 
   const getDaysRemainingText = (days) => {
     if (days < 0) return { text: `Overdue by ${Math.abs(days)}d`, class: 'overdue' };
-    if (days === 0) return { text: 'Due Today', class: 'due-today' };
-    if (days === 1) return { text: 'Due Tomorrow', class: 'due-tomorrow' };
-    return { text: `${days} days left`, class: 'days-left' };
+    if (days === 0) return { text: 'Due Today!', class: 'due-today' };
+    if (days === 1) return { text: 'Due Tomorrow', class: 'urgent' };
+    if (days <= 3) return { text: `${days} days left`, class: 'urgent' };
+    return { text: `${days} days remaining`, class: 'normal' };
   };
 
   // Filter deadlines
@@ -70,13 +115,116 @@ export default function StudentDashboard() {
   const regularAnnouncements = filteredAnnouncements.filter(a => !a.isPinned);
   const displayAnnouncements = [...pinnedAnnouncements, ...regularAnnouncements];
 
+  const handleShareDeadline = (d) => {
+    const text = formatDeadlineForWhatsApp(d);
+    openWhatsApp({ text });
+  };
+
+  const handleShareAnnouncement = (a) => {
+    const text = formatAnnouncementForWhatsApp(a);
+    openWhatsApp({ text });
+  };
+
+  const handleShareEvent = (e) => {
+    const text = formatEventForWhatsApp(e);
+    openWhatsApp({ text });
+  };
+
+  const handleClassGroupSubmit = (e) => {
+    e.preventDefault();
+    if (!classHeadPhone.trim() || !classInviteLink.trim() || !saveClassWhatsAppGroup) return;
+
+    const savedGroup = saveClassWhatsAppGroup({
+      year: classGroupYear,
+      headName: currentUser?.name || 'Class Head',
+      headId: currentUser?.id || '',
+      headPhone: classHeadPhone,
+      inviteLink: classInviteLink
+    });
+
+    setClassGroupStatus(`${savedGroup.title} saved`);
+    setTimeout(() => setClassGroupStatus(''), 2500);
+  };
+
+  const copyGeneratedClassTitle = () => {
+    navigator.clipboard.writeText(generatedClassTitle);
+    setClassGroupStatus('Class title copied');
+    setTimeout(() => setClassGroupStatus(''), 2500);
+  };
+
+  const openWhatsAppHome = () => {
+    window.open('https://web.whatsapp.com/', '_blank', 'noopener,noreferrer');
+  };
+
+  const openClassGroupContact = (group) => {
+    if (!group) return;
+    if (group.inviteLink) {
+      window.open(group.inviteLink, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    openWhatsApp({
+      phone: group.headPhone,
+      text: formatClassGroupJoinRequest(group, currentUser)
+    });
+  };
+
+  const handleTimetableFieldChange = (e) => {
+    const { name, value } = e.target;
+    setTimetableForm(prev => ({ ...prev, [name]: value }));
+  };
+
+  const resetTimetableForm = () => {
+    setTimetableForm({
+      day: 'Monday',
+      time: '',
+      course: '',
+      room: '',
+      year: 'All Years'
+    });
+    setEditingTimetableId(null);
+    setShowTimetableForm(false);
+  };
+
+  const handleTimetableSubmit = (e) => {
+    e.preventDefault();
+    if (!timetableForm.course.trim() || !timetableForm.time.trim() || !timetableForm.room.trim()) return;
+
+    const payload = {
+      day: timetableForm.day,
+      time: timetableForm.time.trim(),
+      course: timetableForm.course.trim(),
+      room: timetableForm.room.trim(),
+      year: timetableForm.year
+    };
+
+    if (editingTimetableId) {
+      updateTimetableSlot(editingTimetableId, payload);
+    } else {
+      addTimetableSlot(payload);
+    }
+
+    resetTimetableForm();
+  };
+
+  const startTimetableEdit = (slot) => {
+    setTimetableForm({
+      day: slot.day || 'Monday',
+      time: slot.time || '',
+      course: slot.course || '',
+      room: slot.room || '',
+      year: slot.year || 'All Years'
+    });
+    setEditingTimetableId(slot.id);
+    setShowTimetableForm(true);
+  };
+
   return (
     <div className="dashboard-content container animate-fade-in">
       {/* Welcome Banner */}
       <header className="dashboard-hero glass-panel">
         <div className="hero-text">
-          <h1>Creative Portal, TTU</h1>
-          <p>Welcome back, <strong>{currentUser.name}</strong>. Here is your graphic design department schedule.</p>
+          <h1>{currentUser?.name || 'Student Dashboard'}</h1>
+          <p>Signed in as <strong>{currentUser.name}</strong> ({currentUser.year || 'Year 1'} Graphic Design). Track your assignments, download course notes, and check submission deadlines.</p>
         </div>
         <div className="hero-stats">
           <div className="hero-stat-card">
@@ -144,6 +292,92 @@ export default function StudentDashboard() {
                         </div>
                         <h3 className="deadline-title">{d.title}</h3>
                         <p className="deadline-desc">{d.description}</p>
+
+                        {/* Attached Assignment Document / Notes from Lecturer or Admin */}
+                        {d.attachment?.dataUrl && (
+                          <div className="deadline-attachment-container" style={{
+                            marginTop: '12px',
+                            padding: '10px 14px',
+                            background: 'rgba(37, 99, 235, 0.08)',
+                            border: '1px solid rgba(59, 130, 246, 0.3)',
+                            borderRadius: '10px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            flexWrap: 'wrap',
+                            gap: '8px'
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span style={{ fontSize: '20px' }}>📄</span>
+                              <div>
+                                <strong style={{ color: '#1e40af', fontSize: '13px', display: 'block' }}>
+                                  {d.attachment.name}
+                                </strong>
+                                <span style={{ color: '#64748b', fontSize: '11px' }}>
+                                  Attached by {d.author || 'Department'} {d.attachment.size ? `• ${d.attachment.size}` : ''}
+                                </span>
+                              </div>
+                            </div>
+                            <div style={{ display: 'flex', gap: '6px' }}>
+                              <a
+                                href={d.attachment.dataUrl}
+                                download={d.attachment.name}
+                                style={{
+                                  background: '#2563eb',
+                                  color: '#fff',
+                                  padding: '6px 12px',
+                                  borderRadius: '6px',
+                                  fontSize: '11.5px',
+                                  fontWeight: 600,
+                                  textDecoration: 'none',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px'
+                                }}
+                              >
+                                📥 Download File / Notes
+                              </a>
+                              <a
+                                href={d.attachment.dataUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{
+                                  background: 'rgba(37, 99, 235, 0.15)',
+                                  color: '#1d4ed8',
+                                  padding: '6px 10px',
+                                  borderRadius: '6px',
+                                  fontSize: '11.5px',
+                                  fontWeight: 600,
+                                  textDecoration: 'none'
+                                }}
+                              >
+                                👁️ Open
+                              </a>
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="deadline-action-row" style={{ marginTop: '10px' }}>
+                          <button
+                            type="button"
+                            onClick={() => handleShareDeadline(d)}
+                            style={{
+                              background: 'rgba(37, 211, 102, 0.12)',
+                              border: '1px solid rgba(37, 211, 102, 0.35)',
+                              color: '#16a34a',
+                              padding: '4px 10px',
+                              borderRadius: '6px',
+                              fontSize: '11px',
+                              fontWeight: '600',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}
+                          >
+                            <span>💬 Share to WhatsApp</span>
+                          </button>
+                        </div>
                       </div>
 
                       <div className="deadline-timing">
@@ -195,6 +429,27 @@ export default function StudentDashboard() {
                     </div>
                     <h3 className="announcement-title">{a.title}</h3>
                     <p className="announcement-content-text">{a.content}</p>
+                    <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'flex-end' }}>
+                      <button
+                        type="button"
+                        onClick={() => handleShareAnnouncement(a)}
+                        style={{
+                          background: 'rgba(37, 211, 102, 0.12)',
+                          border: '1px solid rgba(37, 211, 102, 0.35)',
+                          color: '#16a34a',
+                          padding: '4px 10px',
+                          borderRadius: '6px',
+                          fontSize: '11px',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}
+                      >
+                        <span>💬 Forward on WhatsApp</span>
+                      </button>
+                    </div>
                   </div>
                 ))
               )}
@@ -204,6 +459,79 @@ export default function StudentDashboard() {
 
         {/* Sidebar: Events & Timetable */}
         <aside className="dashboard-sidebar-area">
+
+          <section className="glass-panel sidebar-section mb-4 class-whatsapp-section">
+            <h2>Class WhatsApp Group</h2>
+
+            {canManageClassGroup ? (
+              <form className="class-whatsapp-form" onSubmit={handleClassGroupSubmit}>
+                <div className="class-group-title-preview">
+                  <span>Auto title</span>
+                  <strong>{generatedClassTitle}</strong>
+                </div>
+
+                <div className="class-group-quick-actions">
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={copyGeneratedClassTitle}>
+                    Copy Title
+                  </button>
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={openWhatsAppHome}>
+                    Open WhatsApp
+                  </button>
+                </div>
+
+                <div className="form-group">
+                  <label>Class / Year</label>
+                  <select value={classGroupYear} onChange={(e) => setClassGroupYear(e.target.value)}>
+                    {CLASS_YEAR_OPTIONS.map(year => (
+                      <option key={year} value={year}>{year}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Class Head WhatsApp Number</label>
+                  <input
+                    type="tel"
+                    value={classHeadPhone}
+                    onChange={(e) => setClassHeadPhone(e.target.value)}
+                    placeholder="233241234567"
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>WhatsApp Group Invite Link</label>
+                  <input
+                    type="url"
+                    value={classInviteLink}
+                    onChange={(e) => setClassInviteLink(e.target.value)}
+                    placeholder="https://chat.whatsapp.com/..."
+                    required
+                  />
+                </div>
+
+                <button type="submit" className="btn btn-accent w-full">
+                  Save Group Link
+                </button>
+                {classGroupStatus && <p className="class-group-status">{classGroupStatus}</p>}
+              </form>
+            ) : currentStudentClassGroup?.inviteLink ? (
+              <div className="class-group-student-card">
+                <h3>{currentStudentClassGroup.title}</h3>
+                <p>Class Head: {currentStudentClassGroup.headName}</p>
+                <p>Invite link available</p>
+                <button
+                  type="button"
+                  className="btn btn-accent w-full"
+                  onClick={() => openClassGroupContact(currentStudentClassGroup)}
+                >
+                  Join Class Group
+                </button>
+              </div>
+            ) : (
+              <p className="empty-sidebar-text">Your class group invite link has not been saved yet.</p>
+            )}
+          </section>
 
           {/* Upcoming Events Card */}
           <section className="glass-panel sidebar-section mb-4">
@@ -222,6 +550,25 @@ export default function StudentDashboard() {
                       <h3>{e.title}</h3>
                       <p className="event-location">📍 {e.location}</p>
                       <p className="event-time">⏰ {e.time} | {e.type}</p>
+                      <button
+                        type="button"
+                        onClick={() => handleShareEvent(e)}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#25D366',
+                          fontSize: '11px',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          padding: '2px 0',
+                          marginTop: '4px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '3px'
+                        }}
+                      >
+                        <span>💬 Share Event</span>
+                      </button>
                     </div>
                   </div>
                 ))
@@ -231,18 +578,91 @@ export default function StudentDashboard() {
 
           {/* Schedule / Timetable Card */}
           <section className="glass-panel sidebar-section">
-            <h2>Your Weekly Classes</h2>
-            <div className="timetable-list">
-              {studentTimetable.map((slot, index) => (
-                <div key={index} className="timetable-slot">
-                  <div className="slot-day-tag">{slot.day}</div>
-                  <div className="slot-details">
-                    <h4>{slot.course}</h4>
-                    <p>{slot.time}</p>
-                    <span className="slot-room">{slot.room}</span>
-                  </div>
+            <div className="student-timetable-header">
+              <h2>Your Weekly Classes</h2>
+              {canManageTimetable && (
+                <button
+                  type="button"
+                  className="btn btn-primary btn-xs"
+                  onClick={() => {
+                    if (showTimetableForm) {
+                      resetTimetableForm();
+                    } else {
+                      setShowTimetableForm(true);
+                    }
+                  }}
+                >
+                  {showTimetableForm ? 'Cancel' : 'Add Class'}
+                </button>
+              )}
+            </div>
+
+            {canManageTimetable && showTimetableForm && (
+              <form onSubmit={handleTimetableSubmit} className="student-head-timetable-form">
+                <div className="form-group">
+                  <label>Day</label>
+                  <select name="day" value={timetableForm.day} onChange={handleTimetableFieldChange}>
+                    <option value="Monday">Monday</option>
+                    <option value="Tuesday">Tuesday</option>
+                    <option value="Wednesday">Wednesday</option>
+                    <option value="Thursday">Thursday</option>
+                    <option value="Friday">Friday</option>
+                    <option value="Saturday">Saturday</option>
+                    <option value="Sunday">Sunday</option>
+                  </select>
                 </div>
-              ))}
+                <div className="form-group">
+                  <label>Class Time</label>
+                  <input name="time" type="text" placeholder="08:30 AM - 11:30 AM" value={timetableForm.time} onChange={handleTimetableFieldChange} required />
+                </div>
+                <div className="form-group">
+                  <label>Course</label>
+                  <input name="course" type="text" placeholder="Layout Design II" value={timetableForm.course} onChange={handleTimetableFieldChange} required />
+                </div>
+                <div className="form-group">
+                  <label>Room</label>
+                  <input name="room" type="text" placeholder="Lab 3" value={timetableForm.room} onChange={handleTimetableFieldChange} required />
+                </div>
+                <div className="form-group">
+                  <label>Year Group</label>
+                  <select name="year" value={timetableForm.year} onChange={handleTimetableFieldChange}>
+                    <option value="All Years">All Years</option>
+                    <option value="Year 1">Year 1</option>
+                    <option value="Year 2">Year 2</option>
+                    <option value="Year 3">Year 3</option>
+                    <option value="Year 4">Year 4</option>
+                  </select>
+                </div>
+                <button type="submit" className="btn btn-accent w-full">
+                  {editingTimetableId ? 'Save Class' : 'Publish Class'}
+                </button>
+              </form>
+            )}
+
+            <div className="timetable-list">
+              {visibleTimetable.length === 0 ? (
+                <p className="empty-sidebar-text">No classes published yet.</p>
+              ) : (
+                visibleTimetable.map(slot => (
+                  <div key={slot.id} className="timetable-slot">
+                    <div className="slot-day-tag">{slot.day}</div>
+                    <div className="slot-details">
+                      <h4>{slot.course}</h4>
+                      <p>{slot.time}</p>
+                      <div className="slot-meta-row">
+                        <span className="slot-room">{slot.room}</span>
+                        {slot.year && <span className="slot-year">{slot.year}</span>}
+                      </div>
+                      {canManageTimetable && (
+                        <div className="student-head-actions">
+                          <button type="button" onClick={() => startTimetableEdit(slot)}>Edit</button>
+                          <button type="button" className="danger" onClick={() => deleteTimetableSlot(slot.id)}>Remove</button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </section>
 

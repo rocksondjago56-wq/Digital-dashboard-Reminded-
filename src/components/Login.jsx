@@ -2,12 +2,14 @@ import React, { useState, useContext } from 'react';
 import { DbContext } from '../context/DbContextDefinition';
 import './Login.css';
 import ttuLogo from '../ttu-logo.png.png';
+import { openWhatsApp, getWhatsAppConfig } from '../utils/whatsapp';
 
 export default function Login() {
   const { login, signUp } = useContext(DbContext);
   const [isSignUp, setIsSignUp] = useState(false);
   const [error, setError] = useState('');
-  
+  const [successMsg, setSuccessMsg] = useState('');
+
   // Login State
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -15,54 +17,85 @@ export default function Login() {
   // Sign Up State
   const [regName, setRegName] = useState('');
   const [regEmail, setRegEmail] = useState('');
-  const regIndexNumber = '';
   const [regPassword, setRegPassword] = useState('');
   const [regRole, setRegRole] = useState('student');
+
+  // Student extra fields
   const [regYear, setRegYear] = useState('Year 1');
+  const [regIndexNumber, setRegIndexNumber] = useState('');
+
+  // Lecturer extra fields
+  const [regStaffId, setRegStaffId] = useState('');
   const [regCourses, setRegCourses] = useState('');
 
-  const handleSignIn = (e) => {
+  // Administrator extra fields
+  const [regDesignation, setRegDesignation] = useState('Head of Department');
+  const [regAdminKey, setRegAdminKey] = useState('');
+
+  const handleSignIn = async (e) => {
     e.preventDefault();
     setError('');
+    setSuccessMsg('');
     
     if (!email || !password) {
       setError('Please fill in all fields.');
       return;
     }
 
-    const result = login(email, password);
+    const result = await login(email, password);
     if (!result.success) {
       setError(result.message);
     }
   };
 
-  const handleSignUp = (e) => {
+  const handleSignUp = async (e) => {
     e.preventDefault();
     setError('');
+    setSuccessMsg('');
 
     if (!regName || !regEmail || !regPassword) {
       setError('Please fill in all required fields.');
       return;
     }
 
-    const extraFields = {};
-    if (regRole === 'student') {
-      extraFields.year = regYear;
-      extraFields.studentId = regIndexNumber || `04${Math.floor(10000000 + Math.random() * 90000000)}`;
-      extraFields.indexNumber = extraFields.studentId;
-    } else if (regRole === 'lecturer') {
-      extraFields.courses = regCourses || 'General Design';
+    if (regPassword.length < 6) {
+      setError('Password must be at least 6 characters.');
+      return;
     }
 
-    const result = signUp(regName, regEmail, regPassword, regRole, extraFields);
+    const extraFields = {};
+    if (regRole === 'student' || regRole === 'student_head') {
+      extraFields.year = regYear;
+      extraFields.studentId = regIndexNumber.trim() || `04${Math.floor(10000000 + Math.random() * 90000000)}`;
+      extraFields.indexNumber = extraFields.studentId;
+    } else if (regRole === 'lecturer') {
+      extraFields.courses = regCourses.trim() || 'General Design Studio';
+      extraFields.staffId = regStaffId.trim() || `LEC-${Math.floor(1000 + Math.random() * 9000)}`;
+    } else if (regRole === 'admin') {
+      extraFields.designation = regDesignation || 'Department Administrator';
+      extraFields.staffId = regAdminKey.trim() || `ADM-${Math.floor(1000 + Math.random() * 9000)}`;
+    }
+
+    const result = await signUp(regName, regEmail, regPassword, regRole, extraFields);
     if (!result.success) {
       setError(result.message);
+    } else if (result.message) {
+      setSuccessMsg(result.message);
     }
   };
 
   const toggleMode = () => {
     setIsSignUp(!isSignUp);
     setError('');
+    setSuccessMsg('');
+  };
+
+  const handleWhatsAppHelp = () => {
+    const config = getWhatsAppConfig();
+    openWhatsApp({
+      phone: config.departmentPhone,
+      text: `Hello TTU Graphic Design Department Desk, I need help with ${isSignUp ? 'creating my account' : 'signing in'} on the department portal.`
+    });
   };
 
   return (
@@ -72,13 +105,27 @@ export default function Login() {
           <div className="ttu-logo-sim">
             <img src={ttuLogo} alt="Takoradi Technical University Logo" className="ttu-logo-img" />
           </div>
-          {isSignUp && <h1>Create Account</h1>}
+          <h1>{isSignUp ? 'Create Portal Account' : 'Department Portal Sign In'}</h1>
           <p className="subtitle">Graphic Design Dept · Reminder & Announcement System</p>
         </div>
 
         {error && (
           <div className="login-error-alert">
-            <span>⚠️ {error}</span>
+            <span>Warning: {error}</span>
+          </div>
+        )}
+
+        {successMsg && (
+          <div className="login-success-alert" style={{
+            background: 'rgba(34, 197, 94, 0.1)',
+            border: '1px solid rgba(34, 197, 94, 0.4)',
+            color: '#15803d',
+            padding: '12px 16px',
+            borderRadius: 'var(--radius-sm)',
+            marginBottom: '20px',
+            fontSize: '0.9rem'
+          }}>
+            <span>Success: {successMsg}</span>
           </div>
         )}
 
@@ -87,11 +134,11 @@ export default function Login() {
           <>
             <form onSubmit={handleSignIn} className="login-form">
               <div className="form-group">
-                <label htmlFor="email">Departmental Email</label>
+                <label htmlFor="email">Departmental Email or Index Number</label>
                 <input
-                  type="email"
+                  type="text"
                   id="email"
-                  placeholder="e.g. student@ttu.edu.gh"
+                  placeholder="e.g. student@ttu.edu.gh or 0420210088"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -103,7 +150,7 @@ export default function Login() {
                 <input
                   type="password"
                   id="password"
-                  placeholder="••••••••"
+                  placeholder="Enter password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
@@ -115,7 +162,7 @@ export default function Login() {
               </button>
             </form>
 
-            <div className="switch-mode-text mt-2">
+            <div className="switch-mode-text mt-3">
               <p>Don't have an account? <span onClick={toggleMode} className="switch-mode-link">Sign Up Now</span></p>
             </div>
           </>
@@ -128,7 +175,7 @@ export default function Login() {
                 <input
                   type="text"
                   id="regName"
-                  placeholder="e.g. John Doe"
+                  placeholder="e.g. Emmanuel Rockson / Dr. Andrews"
                   value={regName}
                   onChange={(e) => setRegName(e.target.value)}
                   required
@@ -136,11 +183,11 @@ export default function Login() {
               </div>
 
               <div className="form-group">
-                <label htmlFor="regEmail">Departmental Email</label>
+                <label htmlFor="regEmail">Departmental Email Address</label>
                 <input
                   type="email"
                   id="regEmail"
-                  placeholder="e.g. jdoe@ttu.edu.gh"
+                  placeholder="e.g. name@ttu.edu.gh"
                   value={regEmail}
                   onChange={(e) => setRegEmail(e.target.value)}
                   required
@@ -152,28 +199,32 @@ export default function Login() {
                 <input
                   type="password"
                   id="regPassword"
-                  placeholder="Password (minimum 6 characters)"
+                  placeholder="Minimum 6 characters"
                   value={regPassword}
                   onChange={(e) => setRegPassword(e.target.value)}
                   required
                 />
               </div>
 
-              <div className="form-row-2">
-                <div className="form-group">
-                  <label htmlFor="regRole">Role</label>
-                  <select 
-                    id="regRole" 
-                    value={regRole} 
-                    onChange={(e) => setRegRole(e.target.value)}
-                  >
-                    <option value="student">Student</option>
-                    <option value="lecturer">Lecturer</option>
-                    <option value="admin">Administrator</option>
-                  </select>
-                </div>
+              {/* ACCOUNT TYPE SELECTION */}
+              <div className="form-group">
+                <label htmlFor="regRole">Select Account Role</label>
+                <select
+                  id="regRole"
+                  value={regRole}
+                  onChange={(e) => setRegRole(e.target.value)}
+                  style={{ fontWeight: 600 }}
+                >
+                  <option value="student">Student Account</option>
+                  <option value="student_head">Student Head / Class Representative</option>
+                  <option value="lecturer">Lecturer / Faculty Member</option>
+                  <option value="admin">Department Administrator</option>
+                </select>
+              </div>
 
-                {regRole === 'student' && (
+              {/* STUDENT ROLE FIELDS */}
+              {(regRole === 'student' || regRole === 'student_head') && (
+                <div className="form-row-2">
                   <div className="form-group">
                     <label htmlFor="regYear">Academic Year</label>
                     <select 
@@ -181,39 +232,136 @@ export default function Login() {
                       value={regYear} 
                       onChange={(e) => setRegYear(e.target.value)}
                     >
-                      <option value="Year 1">Year 1</option>
-                      <option value="Year 2">Year 2</option>
-                      <option value="Year 3">Year 3</option>
-                      <option value="Year 4">Year 4</option>
+                      <option value="Year 1">Year 1 (Freshman)</option>
+                      <option value="Year 2">Year 2 (Sophomore)</option>
+                      <option value="Year 3">Year 3 (Junior)</option>
+                      <option value="Year 4">Year 4 (Senior)</option>
                     </select>
                   </div>
-                )}
-              </div>
 
-              {regRole === 'lecturer' && (
-                <div className="form-group">
-                  <label htmlFor="regCourses">Courses Taught (comma separated)</label>
-                  <input
-                    type="text"
-                    id="regCourses"
-                    placeholder="e.g. Typography I, Graphic Art Studio"
-                    value={regCourses}
-                    onChange={(e) => setRegCourses(e.target.value)}
-                    required
-                  />
+                  <div className="form-group">
+                    <label htmlFor="regIndexNumber">Index / Student ID (Optional)</label>
+                    <input
+                      type="text"
+                      id="regIndexNumber"
+                      placeholder="e.g. 0420210088"
+                      value={regIndexNumber}
+                      onChange={(e) => setRegIndexNumber(e.target.value)}
+                    />
+                  </div>
                 </div>
               )}
 
+              {/* LECTURER ROLE FIELDS */}
+              {regRole === 'lecturer' && (
+                <>
+                  <div className="form-group">
+                    <label htmlFor="regStaffId">Staff ID / Lecturer ID (Optional)</label>
+                    <input
+                      type="text"
+                      id="regStaffId"
+                      placeholder="e.g. LEC-0492"
+                      value={regStaffId}
+                      onChange={(e) => setRegStaffId(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="regCourses">Assigned Courses Taught (comma separated)</label>
+                    <input
+                      type="text"
+                      id="regCourses"
+                      placeholder="e.g. Layout Design II, Vector Graphics I, Typography"
+                      value={regCourses}
+                      onChange={(e) => setRegCourses(e.target.value)}
+                      required
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* ADMINISTRATOR ROLE FIELDS */}
+              {regRole === 'admin' && (
+                <>
+                  <div className="form-group">
+                    <label htmlFor="regDesignation">Administrative Title / Designation</label>
+                    <select
+                      id="regDesignation"
+                      value={regDesignation}
+                      onChange={(e) => setRegDesignation(e.target.value)}
+                    >
+                      <option value="Head of Department">Head of Department (HOD)</option>
+                      <option value="Examinations & Records Officer">Examinations & Records Officer</option>
+                      <option value="Department Secretary & Admin">Department Secretary & Admin</option>
+                      <option value="IT & Studio Coordinator">IT & Studio Coordinator</option>
+                      <option value="Department Administrator">Department Administrator</option>
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="regAdminKey">Admin Passcode / Staff ID (Optional)</label>
+                    <input
+                      type="text"
+                      id="regAdminKey"
+                      placeholder="e.g. ADM-TTU-2026"
+                      value={regAdminKey}
+                      onChange={(e) => setRegAdminKey(e.target.value)}
+                    />
+                    <small style={{ display: 'block', marginTop: '4px', color: '#64748b', fontSize: '11px' }}>
+                      Allows immediate access to post announcements, manage deadlines, and oversee events.
+                    </small>
+                  </div>
+                </>
+              )}
+
               <button type="submit" className="btn btn-accent w-full mt-2">
-                Create Account
+                Create {regRole === 'admin' ? 'Administrator' : regRole === 'lecturer' ? 'Lecturer' : regRole === 'student_head' ? 'Student Head' : 'Student'} Account
               </button>
             </form>
 
-            <div className="switch-mode-text mt-2">
+            <div className="switch-mode-text mt-3">
               <p>Already have an account? <span onClick={toggleMode} className="switch-mode-link">Sign In Now</span></p>
             </div>
           </>
         )}
+
+        {/* WhatsApp Quick Connect Footer */}
+        <div style={{
+          marginTop: '24px',
+          padding: '12px 14px',
+          background: 'rgba(37, 211, 102, 0.08)',
+          border: '1px solid rgba(37, 211, 102, 0.25)',
+          borderRadius: '10px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          fontSize: '12px',
+          color: '#334155'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '18px' }}>💬</span>
+            <div>
+              <strong style={{ color: '#0f172a', display: 'block' }}>WhatsApp Help Desk</strong>
+              <span style={{ color: '#64748b', fontSize: '11px' }}>Need help with login or access?</span>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleWhatsAppHelp}
+            style={{
+              background: '#25D366',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '6px',
+              padding: '6px 10px',
+              fontWeight: 600,
+              fontSize: '11px',
+              cursor: 'pointer'
+            }}
+          >
+            Chat Now
+          </button>
+        </div>
 
         <div className="login-footer">
           <p>© 2026 Takoradi Technical University</p>

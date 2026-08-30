@@ -1,4 +1,18 @@
-# React + Vite
+# TTU Graphic Design Reminder & Announcement System
+
+## Production setup
+
+This project is being prepared to use Supabase for authentication, database storage, and protected user data.
+
+1. Create a Supabase project.
+2. Run [`supabase/schema.sql`](supabase/schema.sql) in the Supabase SQL Editor.
+3. Copy `.env.example` to `.env.local` and add the Project URL and publishable key from Supabase's **Connect** dialog.
+4. In Supabase Authentication settings, set the production site URL and allowed redirect URLs, then keep email confirmation enabled.
+5. Run `supabase/migrations/002_lecturer_requests.sql` after the main schema. Public users may request a lecturer account, but the department must approve it by changing the profile role in Supabase. Administrator accounts are issued only by the department.
+
+Never expose a Supabase `service_role` key in this Vite application or commit `.env.local`.
+
+## Development
 
 This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
 

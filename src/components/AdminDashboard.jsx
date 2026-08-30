@@ -1,32 +1,50 @@
 import React, { useContext, useState } from 'react';
 import { DbContext } from '../context/DbContextDefinition';
 import './AdminDashboard.css';
+import {
+  openWhatsApp,
+  formatAnnouncementForWhatsApp,
+  formatDeadlineForWhatsApp,
+  formatEventForWhatsApp,
+  createClassGroupTitle
+} from '../utils/whatsapp';
+
+const CLASS_YEAR_OPTIONS = ['Year 1', 'Year 2', 'Year 3', 'Year 4'];
 
 export default function AdminDashboard() {
   const {
+    currentUser,
     users,
     deadlines,
     events,
     announcements,
+    timetable,
+    classGroups,
     addDeadline,
     deleteDeadline,
     addAnnouncement,
     deleteAnnouncement,
     addEvent,
     deleteEvent,
+    addTimetableSlot,
+    updateTimetableSlot,
+    deleteTimetableSlot,
+    saveClassWhatsAppGroup,
+    deleteClassWhatsAppGroup,
     updateUserRole
   } = useContext(DbContext);
 
-  const [adminTab, setAdminTab] = useState('announcements'); // announcements, events, deadlines, users
+  const [adminTab, setAdminTab] = useState('announcements'); // announcements, events, deadlines, timetable, whatsapp, users
 
   // Form toggles
   const [showForm, setShowForm] = useState(false);
+  const [editingTimetableId, setEditingTimetableId] = useState(null);
 
   // Forms Fields State
   const [annTitle, setAnnTitle] = useState('');
   const [annContent, setAnnContent] = useState('');
   const [annCategory, setAnnCategory] = useState('notice');
-  const [annAuthor, setAnnAuthor] = useState('HOD Office');
+  const [annAuthor, setAnnAuthor] = useState(currentUser?.name || 'HOD Office');
   const [annPinned, setAnnPinned] = useState(false);
 
   const [evtTitle, setEvtTitle] = useState('');
@@ -42,6 +60,20 @@ export default function AdminDashboard() {
   const [dlCourse, setDlCourse] = useState('Layout Design II');
   const [dlDate, setDlDate] = useState('');
   const [dlType, setDlType] = useState('assignment');
+  const [dlAttachment, setDlAttachment] = useState(null);
+  const [attachmentError, setAttachmentError] = useState('');
+
+  const [ttDay, setTtDay] = useState('Monday');
+  const [ttTime, setTtTime] = useState('');
+  const [ttCourse, setTtCourse] = useState('');
+  const [ttRoom, setTtRoom] = useState('');
+  const [ttYear, setTtYear] = useState('All Years');
+
+  const [wgYear, setWgYear] = useState('Year 1');
+  const [wgHeadName, setWgHeadName] = useState('');
+  const [wgHeadPhone, setWgHeadPhone] = useState('');
+  const [wgInviteLink, setWgInviteLink] = useState('');
+  const [wgStatus, setWgStatus] = useState('');
 
   // Submit handlers
   const handleAnnSubmit = (e) => {
@@ -50,7 +82,7 @@ export default function AdminDashboard() {
     addAnnouncement({
       title: annTitle,
       content: annContent,
-      author: annAuthor || 'HOD Office',
+      author: annAuthor || currentUser?.name || 'HOD Office',
       authorRole: 'admin',
       category: annCategory,
       isPinned: annPinned
@@ -72,7 +104,7 @@ export default function AdminDashboard() {
       time: evtTime,
       type: evtType,
       organizer: evtOrg,
-      author: evtOrg || 'HOD Office',
+      author: currentUser?.name || evtOrg || 'HOD Office',
       authorRole: 'admin'
     });
     setEvtTitle('');
@@ -80,6 +112,34 @@ export default function AdminDashboard() {
     setEvtLoc('');
     setEvtDate('');
     setShowForm(false);
+  };
+
+  const handleDeadlineAttachment = (e) => {
+    const file = e.target.files?.[0];
+    setAttachmentError('');
+
+    if (!file) {
+      setDlAttachment(null);
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setDlAttachment(null);
+      setAttachmentError('Please choose a document smaller than 5 MB.');
+      e.target.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setDlAttachment({
+        name: file.name,
+        type: file.type || 'application/octet-stream',
+        size: (file.size / 1024).toFixed(1) + ' KB',
+        dataUrl: reader.result
+      });
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleDlSubmit = (e) => {
@@ -91,13 +151,110 @@ export default function AdminDashboard() {
       course: dlCourse,
       dueDate: dlDate,
       type: dlType,
-      author: 'Administration Office',
+      attachment: dlAttachment,
+      author: currentUser?.name || 'Department Administration',
       authorRole: 'admin'
     });
     setDlTitle('');
     setDlDesc('');
     setDlDate('');
+    setDlAttachment(null);
+    setAttachmentError('');
     setShowForm(false);
+  };
+
+  const resetTimetableForm = () => {
+    setTtDay('Monday');
+    setTtTime('');
+    setTtCourse('');
+    setTtRoom('');
+    setTtYear('All Years');
+    setEditingTimetableId(null);
+    setShowForm(false);
+  };
+
+  const handleTimetableSubmit = (e) => {
+    e.preventDefault();
+    if (!ttTime.trim() || !ttCourse.trim() || !ttRoom.trim()) return;
+
+    const payload = {
+      day: ttDay,
+      time: ttTime.trim(),
+      course: ttCourse.trim(),
+      room: ttRoom.trim(),
+      year: ttYear
+    };
+
+    if (editingTimetableId) {
+      updateTimetableSlot(editingTimetableId, payload);
+    } else {
+      addTimetableSlot(payload);
+    }
+
+    resetTimetableForm();
+  };
+
+  const startTimetableEdit = (slot) => {
+    setTtDay(slot.day || 'Monday');
+    setTtTime(slot.time || '');
+    setTtCourse(slot.course || '');
+    setTtRoom(slot.room || '');
+    setTtYear(slot.year || 'All Years');
+    setEditingTimetableId(slot.id);
+    setShowForm(true);
+  };
+
+  const resetWhatsAppGroupForm = () => {
+    setWgYear('Year 1');
+    setWgHeadName('');
+    setWgHeadPhone('');
+    setWgInviteLink('');
+    setWgStatus('');
+    setShowForm(false);
+  };
+
+  const handleWhatsAppGroupSubmit = (e) => {
+    e.preventDefault();
+    if (!wgHeadPhone.trim() || !wgInviteLink.trim() || !saveClassWhatsAppGroup) return;
+
+    const savedGroup = saveClassWhatsAppGroup({
+      year: wgYear,
+      headName: wgHeadName.trim() || 'Class Head',
+      headPhone: wgHeadPhone,
+      inviteLink: wgInviteLink
+    });
+
+    setWgStatus(`${savedGroup.title} saved`);
+    setTimeout(() => setWgStatus(''), 2500);
+  };
+
+  const startWhatsAppGroupEdit = (group) => {
+    setWgYear(group.year || 'Year 1');
+    setWgHeadName(group.headName || '');
+    setWgHeadPhone(group.headPhone || '');
+    setWgInviteLink(group.inviteLink || '');
+    setShowForm(true);
+  };
+
+  const copyAdminGroupTitle = () => {
+    navigator.clipboard.writeText(createClassGroupTitle(wgYear));
+    setWgStatus('Class title copied');
+    setTimeout(() => setWgStatus(''), 2500);
+  };
+
+  const openWhatsAppHome = () => {
+    window.open('https://web.whatsapp.com/', '_blank', 'noopener,noreferrer');
+  };
+
+  const switchAdminTab = (tab) => {
+    setAdminTab(tab);
+    setShowForm(false);
+    setEditingTimetableId(null);
+  };
+
+  const formatRoleLabel = (role) => {
+    if (role === 'student_head') return 'student head';
+    return role;
   };
 
   return (
@@ -106,8 +263,8 @@ export default function AdminDashboard() {
       {/* Admin Hero */}
       <header className="dashboard-hero glass-panel admin-hero">
         <div className="hero-text">
-          <h1>Admin Control Panel</h1>
-          <p>Supervise academic schedules, coordinate public events, publish official department circulars, and manage student/lecturer access permissions.</p>
+          <h1>{currentUser?.name || 'Department Administrator'}</h1>
+          <p>Signed in as <strong>{currentUser?.name}</strong> ({currentUser?.designation || 'Administrator'}). Departmental control center for Graphic Design notices, academic deadlines, and course events.</p>
         </div>
       </header>
 
@@ -141,31 +298,57 @@ export default function AdminDashboard() {
             <span className="metric-label">Registered Members</span>
           </div>
         </div>
+        <div className="metric-card glass-panel">
+          <span className="metric-icon">TT</span>
+          <div className="metric-details">
+            <span className="metric-number">{timetable.length}</span>
+            <span className="metric-label">Timetable Classes</span>
+          </div>
+        </div>
+        <div className="metric-card glass-panel">
+          <span className="metric-icon">WA</span>
+          <div className="metric-details">
+            <span className="metric-number">{(classGroups || []).length}</span>
+            <span className="metric-label">Class WhatsApp</span>
+          </div>
+        </div>
       </div>
 
       {/* Admin Nav tabs */}
       <div className="admin-tab-nav mt-4">
         <button 
           className={`admin-nav-btn ${adminTab === 'announcements' ? 'active' : ''}`} 
-          onClick={() => { setAdminTab('announcements'); setShowForm(false); }}
+          onClick={() => switchAdminTab('announcements')}
         >
           📢 Manage Announcements
         </button>
         <button 
           className={`admin-nav-btn ${adminTab === 'events' ? 'active' : ''}`} 
-          onClick={() => { setAdminTab('events'); setShowForm(false); }}
+          onClick={() => switchAdminTab('events')}
         >
           📅 Manage Events
         </button>
         <button 
           className={`admin-nav-btn ${adminTab === 'deadlines' ? 'active' : ''}`} 
-          onClick={() => { setAdminTab('deadlines'); setShowForm(false); }}
+          onClick={() => switchAdminTab('deadlines')}
         >
           📝 Manage Deadlines
         </button>
+        <button
+          className={`admin-nav-btn ${adminTab === 'timetable' ? 'active' : ''}`}
+          onClick={() => switchAdminTab('timetable')}
+        >
+          Manage Timetable
+        </button>
+        <button
+          className={`admin-nav-btn ${adminTab === 'whatsapp' ? 'active' : ''}`}
+          onClick={() => switchAdminTab('whatsapp')}
+        >
+          Manage WhatsApp Groups
+        </button>
         <button 
           className={`admin-nav-btn ${adminTab === 'users' ? 'active' : ''}`} 
-          onClick={() => { setAdminTab('users'); setShowForm(false); }}
+          onClick={() => switchAdminTab('users')}
         >
           👥 User Administration
         </button>
@@ -224,7 +407,29 @@ export default function AdminDashboard() {
                     <p>{a.content}</p>
                     <span className="row-meta">Author: {a.author} | Published: {a.date} | Category: {a.category}</span>
                   </div>
-                  <button onClick={() => deleteAnnouncement(a.id)} className="btn-icon-danger">🗑️ Remove</button>
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                    <button
+                      type="button"
+                      onClick={() => openWhatsApp({ text: formatAnnouncementForWhatsApp(a) })}
+                      style={{
+                        background: 'rgba(37, 211, 102, 0.12)',
+                        border: '1px solid rgba(37, 211, 102, 0.35)',
+                        color: '#16a34a',
+                        padding: '6px 10px',
+                        borderRadius: '6px',
+                        fontSize: '11px',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                      title="Broadcast to WhatsApp"
+                    >
+                      📲 WhatsApp
+                    </button>
+                    <button onClick={() => deleteAnnouncement(a.id)} className="btn-icon-danger">🗑️ Remove</button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -291,7 +496,29 @@ export default function AdminDashboard() {
                     <p>{e.description}</p>
                     <span className="row-meta">Location: {e.location} | Date: {e.date} | Organizer: {e.organizer}</span>
                   </div>
-                  <button onClick={() => deleteEvent(e.id)} className="btn-icon-danger">🗑️ Remove</button>
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                    <button
+                      type="button"
+                      onClick={() => openWhatsApp({ text: formatEventForWhatsApp(e) })}
+                      style={{
+                        background: 'rgba(37, 211, 102, 0.12)',
+                        border: '1px solid rgba(37, 211, 102, 0.35)',
+                        color: '#16a34a',
+                        padding: '6px 10px',
+                        borderRadius: '6px',
+                        fontSize: '11px',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                      title="Broadcast to WhatsApp"
+                    >
+                      📲 WhatsApp
+                    </button>
+                    <button onClick={() => deleteEvent(e.id)} className="btn-icon-danger">🗑️ Remove</button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -333,8 +560,30 @@ export default function AdminDashboard() {
                   </div>
                 </div>
                 <div className="form-group">
-                  <label>Instructions Details</label>
-                  <textarea rows="3" value={dlDesc} onChange={(e) => setDlDesc(e.target.value)} required></textarea>
+                  <label>Instructions & Assignment Notes</label>
+                  <textarea rows="3" value={dlDesc} onChange={(e) => setDlDesc(e.target.value)} placeholder="Provide assignment instructions, grading criteria, notes..." required></textarea>
+                </div>
+                <div className="form-group">
+                  <label htmlFor="admin-dl-attachment">Assignment Document / Notes (PDF, DOCX, ZIP, Images)</label>
+                  <input
+                    type="file"
+                    id="admin-dl-attachment"
+                    accept=".pdf,.doc,.docx,.ppt,.pptx,.txt,.rtf,.zip,.png,.jpg,.jpeg"
+                    onChange={handleDeadlineAttachment}
+                  />
+                  <small style={{ color: '#64748b', fontSize: '11px', display: 'block', marginTop: '4px' }}>
+                    Attach assignment brief, lecture notes, or PDF specifications for students (Max 5 MB).
+                  </small>
+                  {dlAttachment && (
+                    <p style={{ color: '#25D366', fontSize: '12px', marginTop: '6px', fontWeight: 600 }}>
+                      📎 Attached: {dlAttachment.name} ({dlAttachment.size})
+                    </p>
+                  )}
+                  {attachmentError && (
+                    <p style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>
+                      ⚠️ {attachmentError}
+                    </p>
+                  )}
                 </div>
                 <button type="submit" className="btn btn-accent">Publish Deadline</button>
               </form>
@@ -346,16 +595,261 @@ export default function AdminDashboard() {
                   <div className="admin-row-info">
                     <h4>{d.title}</h4>
                     <p>{d.description}</p>
+                    {d.attachment?.dataUrl && (
+                      <div style={{ marginTop: '6px' }}>
+                        <a
+                          href={d.attachment.dataUrl}
+                          download={d.attachment.name}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            background: 'rgba(30, 64, 175, 0.15)',
+                            border: '1px solid rgba(59, 130, 246, 0.3)',
+                            padding: '4px 10px',
+                            borderRadius: '6px',
+                            color: '#2563eb',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            textDecoration: 'none'
+                          }}
+                        >
+                          📄 Attached Document: {d.attachment.name} 📥
+                        </a>
+                      </div>
+                    )}
                     <span className="row-meta">Subject: {d.course} | Due: {d.dueDate} | Type: {d.type}</span>
                   </div>
-                  <button onClick={() => deleteDeadline(d.id)} className="btn-icon-danger">🗑️ Remove</button>
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                    <button
+                      type="button"
+                      onClick={() => openWhatsApp({ text: formatDeadlineForWhatsApp(d) })}
+                      style={{
+                        background: 'rgba(37, 211, 102, 0.12)',
+                        border: '1px solid rgba(37, 211, 102, 0.35)',
+                        color: '#16a34a',
+                        padding: '6px 10px',
+                        borderRadius: '6px',
+                        fontSize: '11px',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                      title="Broadcast to WhatsApp"
+                    >
+                      📲 WhatsApp
+                    </button>
+                    <button onClick={() => deleteDeadline(d.id)} className="btn-icon-danger">🗑️ Remove</button>
+                  </div>
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* TAB 4: USERS MANAGER */}
+        {/* TAB 4: TIMETABLE MANAGER */}
+        {adminTab === 'timetable' && (
+          <div>
+            <div className="tab-actions-row">
+              <h3>Student Weekly Timetable</h3>
+              <button
+                onClick={() => {
+                  if (showForm) {
+                    resetTimetableForm();
+                  } else {
+                    setShowForm(true);
+                  }
+                }}
+                className="btn btn-primary btn-sm"
+              >
+                {showForm ? 'Cancel' : 'Add Class'}
+              </button>
+            </div>
+
+            {showForm && (
+              <form onSubmit={handleTimetableSubmit} className="admin-action-form animate-fade-in">
+                <div className="form-row-3">
+                  <div className="form-group">
+                    <label>Day</label>
+                    <select value={ttDay} onChange={(e) => setTtDay(e.target.value)}>
+                      <option value="Monday">Monday</option>
+                      <option value="Tuesday">Tuesday</option>
+                      <option value="Wednesday">Wednesday</option>
+                      <option value="Thursday">Thursday</option>
+                      <option value="Friday">Friday</option>
+                      <option value="Saturday">Saturday</option>
+                      <option value="Sunday">Sunday</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Class Time</label>
+                    <input type="text" placeholder="08:30 AM - 11:30 AM" value={ttTime} onChange={(e) => setTtTime(e.target.value)} required />
+                  </div>
+                  <div className="form-group">
+                    <label>Year Group</label>
+                    <select value={ttYear} onChange={(e) => setTtYear(e.target.value)}>
+                      <option value="All Years">All Years</option>
+                      <option value="Year 1">Year 1</option>
+                      <option value="Year 2">Year 2</option>
+                      <option value="Year 3">Year 3</option>
+                      <option value="Year 4">Year 4</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="form-row-2">
+                  <div className="form-group">
+                    <label>Course Name</label>
+                    <input type="text" placeholder="Layout Design II" value={ttCourse} onChange={(e) => setTtCourse(e.target.value)} required />
+                  </div>
+                  <div className="form-group">
+                    <label>Room / Studio</label>
+                    <input type="text" placeholder="Lab 3 (Mac Lab)" value={ttRoom} onChange={(e) => setTtRoom(e.target.value)} required />
+                  </div>
+                </div>
+                <button type="submit" className="btn btn-accent">
+                  {editingTimetableId ? 'Save Class Update' : 'Publish Class'}
+                </button>
+              </form>
+            )}
+
+            <div className="admin-data-list mt-2">
+              {timetable.length === 0 ? (
+                <div className="empty-state">
+                  <p>No timetable classes have been published yet.</p>
+                </div>
+              ) : (
+                timetable.map(slot => (
+                  <div key={slot.id} className="admin-data-row admin-timetable-row">
+                    <div className="admin-row-info">
+                      <h4>{slot.course}</h4>
+                      <p>{slot.day} | {slot.time}</p>
+                      <span className="row-meta">Room: {slot.room} | Year: {slot.year || 'All Years'}</span>
+                    </div>
+                    <div className="admin-row-actions">
+                      <button type="button" className="btn btn-secondary btn-sm" onClick={() => startTimetableEdit(slot)}>
+                        Edit
+                      </button>
+                      <button type="button" onClick={() => deleteTimetableSlot(slot.id)} className="btn-icon-danger">
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 5: WHATSAPP GROUPS */}
+        {adminTab === 'whatsapp' && (
+          <div>
+            <div className="tab-actions-row">
+              <h3>Class Head WhatsApp Numbers</h3>
+              <button
+                onClick={() => {
+                  if (showForm) {
+                    resetWhatsAppGroupForm();
+                  } else {
+                    setShowForm(true);
+                  }
+                }}
+                className="btn btn-primary btn-sm"
+              >
+                {showForm ? 'Cancel' : 'Add Class Number'}
+              </button>
+            </div>
+
+            {showForm && (
+              <form onSubmit={handleWhatsAppGroupSubmit} className="admin-action-form animate-fade-in">
+                <div className="admin-generated-title">
+                  <span>Auto class title</span>
+                  <strong>{createClassGroupTitle(wgYear)}</strong>
+                </div>
+                <div className="admin-whatsapp-actions">
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={copyAdminGroupTitle}>
+                    Copy Title
+                  </button>
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={openWhatsAppHome}>
+                    Open WhatsApp
+                  </button>
+                </div>
+                <div className="form-row-3">
+                  <div className="form-group">
+                    <label>Class / Year</label>
+                    <select value={wgYear} onChange={(e) => setWgYear(e.target.value)}>
+                      {CLASS_YEAR_OPTIONS.map(year => (
+                        <option key={year} value={year}>{year}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Class Head Name</label>
+                    <input
+                      type="text"
+                      value={wgHeadName}
+                      onChange={(e) => setWgHeadName(e.target.value)}
+                      placeholder="Class Representative"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Class Head WhatsApp Number</label>
+                    <input
+                      type="tel"
+                      value={wgHeadPhone}
+                      onChange={(e) => setWgHeadPhone(e.target.value)}
+                      placeholder="233241234567"
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label>WhatsApp Group Invite Link</label>
+                  <input
+                    type="url"
+                    value={wgInviteLink}
+                    onChange={(e) => setWgInviteLink(e.target.value)}
+                    placeholder="https://chat.whatsapp.com/..."
+                    required
+                  />
+                </div>
+                <button type="submit" className="btn btn-accent">Save Group Link</button>
+                {wgStatus && <p className="admin-form-status">{wgStatus}</p>}
+              </form>
+            )}
+
+            <div className="admin-data-list mt-2">
+              {(classGroups || []).length === 0 ? (
+                <div className="empty-state">
+                  <p>No class WhatsApp numbers have been saved yet.</p>
+                </div>
+              ) : (
+                classGroups.map(group => (
+                  <div key={group.id} className="admin-data-row">
+                    <div className="admin-row-info">
+                      <h4>{group.title}</h4>
+                      <p>Class Head: {group.headName || 'Class Head'}</p>
+                      <span className="row-meta">
+                        Year: {group.year} | WhatsApp: +{group.headPhone || 'Not set'} {group.inviteLink ? '| Invite link added' : ''}
+                      </span>
+                    </div>
+                    <div className="admin-row-actions">
+                      <button type="button" className="btn btn-secondary btn-sm" onClick={() => startWhatsAppGroupEdit(group)}>
+                        Edit
+                      </button>
+                      <button type="button" onClick={() => deleteClassWhatsAppGroup(group.id)} className="btn-icon-danger">
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 6: USERS MANAGER */}
         {adminTab === 'users' && (
           <div>
             <div className="tab-actions-row">
@@ -383,9 +877,10 @@ export default function AdminDashboard() {
                       <td>
                         <span className={`badge ${
                           u.role === 'admin' ? 'badge-danger' : 
-                          u.role === 'lecturer' ? 'badge-gold' : 'badge-blue'
+                          u.role === 'lecturer' ? 'badge-gold' :
+                          u.role === 'student_head' ? 'badge-success' : 'badge-blue'
                         }`}>
-                          {u.role}
+                          {formatRoleLabel(u.role)}
                         </span>
                       </td>
                       <td>
@@ -395,6 +890,7 @@ export default function AdminDashboard() {
                           className="user-role-select"
                         >
                           <option value="student">Student</option>
+                          <option value="student_head">Student Head</option>
                           <option value="lecturer">Lecturer</option>
                           <option value="admin">Administrator</option>
                         </select>

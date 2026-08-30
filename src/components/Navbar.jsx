@@ -2,6 +2,7 @@ import React, { useContext, useState, useRef, useEffect } from 'react';
 import { DbContext } from '../context/DbContextDefinition';
 import './Navbar.css';
 import ttuLogo from '../ttu-logo.png.png';
+import { openWhatsApp, getWhatsAppConfig } from '../utils/whatsapp';
 
 export default function Navbar() {
   const { currentUser, logout, notifications, markAllNotificationsAsRead, updateUserProfilePic } = useContext(DbContext);
@@ -31,14 +32,8 @@ export default function Navbar() {
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      if (event.target?.result) {
-        updateUserProfilePic(currentUser.id, event.target.result);
-      }
-    };
-    reader.readAsDataURL(file);
+    updateUserProfilePic(currentUser.id, file);
+    e.target.value = '';
   };
 
   const unreadCount = notifications.filter(n => !n.isRead).length;
@@ -50,12 +45,26 @@ export default function Navbar() {
     }
   };
 
+  const handleWhatsAppQuickChat = () => {
+    const config = getWhatsAppConfig();
+    openWhatsApp({
+      phone: config.departmentPhone,
+      text: `Hello TTU Graphic Design Department Desk, this is ${currentUser.name} (${currentUser.role}).`
+    });
+  };
+
   const getRoleBadgeClass = (role) => {
     switch (role) {
       case 'admin': return 'badge-role-admin';
       case 'lecturer': return 'badge-role-lecturer';
+      case 'student_head': return 'badge-role-student-head';
       default: return 'badge-role-student';
     }
+  };
+
+  const getRoleLabel = (role) => {
+    if (role === 'student_head') return 'STUDENT HEAD';
+    return role.toUpperCase();
   };
 
   const formatTimestamp = (isoString) => {
@@ -102,10 +111,21 @@ export default function Navbar() {
           <div className="user-info desktop-only">
             <span className="user-name">{currentUser.name}</span>
             <span className={`user-role ${getRoleBadgeClass(currentUser.role)}`}>
-              {currentUser.role.toUpperCase()}
+              {getRoleLabel(currentUser.role)}
             </span>
           </div>
         </div>
+
+        {/* WhatsApp Desk Button */}
+        <button
+          className="navbar-icon-btn"
+          onClick={handleWhatsAppQuickChat}
+          aria-label="WhatsApp Department Desk"
+          title="Chat with Department Desk on WhatsApp"
+          style={{ background: 'rgba(37, 211, 102, 0.15)', color: '#25D366' }}
+        >
+          <span>💬</span>
+        </button>
 
         {/* Notification Bell */}
         <div className="notification-bell-container" ref={dropdownRef}>

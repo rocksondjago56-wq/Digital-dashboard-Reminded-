@@ -5,6 +5,7 @@ import Navbar from './components/Navbar';
 import StudentDashboard from './components/StudentDashboard';
 import LecturerDashboard from './components/LecturerDashboard';
 import AdminDashboard from './components/AdminDashboard';
+import WhatsAppWidget from './components/WhatsAppWidget';
 
 export default function App() {
   const ctx = useContext(DbContext);
@@ -60,7 +61,12 @@ export default function App() {
 
   // If user is not authenticated, show Login Screen
   if (!currentUser) {
-    return <Login />;
+    return (
+      <>
+        <Login />
+        <WhatsAppWidget />
+      </>
+    );
   }
 
   // Render Navbar and corresponding Dashboard based on Role
@@ -69,7 +75,8 @@ export default function App() {
       <Navbar />
       {currentUser.role === 'admin' && <AdminDashboard />}
       {currentUser.role === 'lecturer' && <LecturerDashboard />}
-      {currentUser.role === 'student' && <StudentDashboard />}
+      {(currentUser.role === 'student' || currentUser.role === 'student_head') && <StudentDashboard />}
+      <WhatsAppWidget />
     </>
   );
 }

@@ -225,6 +225,19 @@
   line-height: 1.4;
 }
 
+.deadline-attachment-link {
+  display: inline-block;
+  margin-top: 10px;
+  color: var(--ttu-blue-vibrant);
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+.deadline-attachment-link:hover {
+  color: var(--ttu-blue);
+}
+
 .deadline-timing {
   display: flex;
   flex-direction: column;
@@ -516,6 +529,141 @@
   color: var(--text-secondary);
 }
 
+.student-timetable-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--border-light);
+  padding-bottom: 12px;
+  margin-bottom: 16px;
+}
+
+.student-timetable-header h2 {
+  border-bottom: none;
+  padding-bottom: 0;
+  margin-bottom: 0;
+}
+
+.btn-xs {
+  padding: 6px 10px;
+  font-size: 0.75rem;
+}
+
+.student-head-timetable-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: #f8fafc;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  padding: 14px;
+  margin-bottom: 16px;
+}
+
+.slot-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.slot-year {
+  display: inline-block;
+  font-size: 0.7rem;
+  background: #eff6ff;
+  color: var(--ttu-blue);
+  border: 1px solid #bfdbfe;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.student-head-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.student-head-actions button {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #004085;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 5px 10px;
+}
+
+.student-head-actions button.danger {
+  color: #dc2626;
+  border-color: rgba(220, 38, 38, 0.3);
+}
+
+.class-whatsapp-section {
+  border-left: 4px solid #16a34a;
+}
+
+.class-whatsapp-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.class-group-title-preview,
+.class-group-student-card {
+  background: #f0fdf4;
+  border: 1px solid rgba(22, 163, 74, 0.2);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+}
+
+.class-group-title-preview span {
+  display: block;
+  color: #15803d;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+
+.class-group-title-preview strong,
+.class-group-student-card h3 {
+  color: #14532d;
+  display: block;
+  font-size: 0.95rem;
+  line-height: 1.25;
+  margin: 0;
+}
+
+.class-group-quick-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.class-group-quick-actions .btn {
+  flex: 1;
+  justify-content: center;
+}
+
+.class-group-student-card p {
+  color: #475569;
+  font-size: 0.8rem;
+  margin: 6px 0;
+}
+
+.class-group-status {
+  color: #15803d;
+  font-size: 0.8rem;
+  font-weight: 700;
+  margin: 0;
+  text-align: center;
+}
+
 @media (max-width: 768px) {
   .dashboard-hero {
     flex-direction: column;
@@ -543,6 +691,106 @@
     left: 56px;
     flex-direction: row;
     align-items: center;
+    gap: 12px;
+  }
+
+  .dashboard-section,
+  .sidebar-section {
+    padding: 16px;
+  }
+
+  .section-header-filters {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .announcement-select {
+    width: 100%;
+  }
+
+  .source-filter-bar {
+    padding: 16px;
+    align-items: flex-start;
+    gap: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .dashboard-content {
+    padding-bottom: 32px;
+  }
+
+  .dashboard-hero {
+    padding: 16px;
+    gap: 16px;
+  }
+
+  .hero-text h1 {
+    font-size: 1.65rem;
+  }
+
+  .hero-text p {
+    font-size: 0.95rem;
+  }
+
+  .hero-stats {
+    gap: 8px;
+  }
+
+  .hero-stat-card {
+    min-width: 0;
+    padding: 12px 8px;
+  }
+
+  .stat-num {
+    font-size: 1.55rem;
+  }
+
+  .section-header-tabs {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .tabs-list {
+    width: 100%;
+  }
+
+  .deadline-card {
+    padding: 16px 16px 54px;
+  }
+
+  .deadline-timing {
+    left: 16px;
+    right: 16px;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .deadline-meta-row,
+  .announcement-meta,
+  .student-identity-meta {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .announcement-card-item {
+    padding: 16px;
+  }
+
+  .timetable-slot {
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .slot-day-tag {
+    width: auto;
+  }
+
+  .hero-student-profile {
+    align-items: flex-start;
     gap: 12px;
   }
 }
