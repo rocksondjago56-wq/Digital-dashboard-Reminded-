@@ -9,6 +9,7 @@ export default function Login() {
   const [isSignUp, setIsSignUp] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Login State
   const [email, setEmail] = useState('');
@@ -34,22 +35,29 @@ export default function Login() {
 
   const handleSignIn = async (e) => {
     e.preventDefault();
+    if (isSubmitting) return;
     setError('');
     setSuccessMsg('');
-    
+
     if (!email || !password) {
       setError('Please fill in all fields.');
       return;
     }
 
-    const result = await login(email, password);
-    if (!result.success) {
-      setError(result.message);
+    setIsSubmitting(true);
+    try {
+      const result = await login(email, password);
+      if (!result.success) {
+        setError(result.message);
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleSignUp = async (e) => {
     e.preventDefault();
+    if (isSubmitting) return;
     setError('');
     setSuccessMsg('');
 
@@ -76,11 +84,16 @@ export default function Login() {
       extraFields.staffId = regAdminKey.trim() || `ADM-${Math.floor(1000 + Math.random() * 9000)}`;
     }
 
-    const result = await signUp(regName, regEmail, regPassword, regRole, extraFields);
-    if (!result.success) {
-      setError(result.message);
-    } else if (result.message) {
-      setSuccessMsg(result.message);
+    setIsSubmitting(true);
+    try {
+      const result = await signUp(regName, regEmail, regPassword, regRole, extraFields);
+      if (!result.success) {
+        setError(result.message);
+      } else if (result.message) {
+        setSuccessMsg(result.message);
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -134,11 +147,11 @@ export default function Login() {
           <>
             <form onSubmit={handleSignIn} className="login-form">
               <div className="form-group">
-                <label htmlFor="email">Departmental Email or Index Number</label>
+                <label htmlFor="email">Email, Full Name, Index Number, or Staff ID</label>
                 <input
                   type="text"
                   id="email"
-                  placeholder="e.g. student@ttu.edu.gh or 0420210088"
+                  placeholder="e.g. Ceasar Djago, student@ttu.edu.gh, or 0420210088"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -157,8 +170,8 @@ export default function Login() {
                 />
               </div>
 
-              <button type="submit" className="btn btn-primary w-full mt-2">
-                Secure Sign In
+              <button type="submit" className="btn btn-primary w-full mt-2" disabled={isSubmitting}>
+                {isSubmitting ? 'Signing In...' : 'Secure Sign In'}
               </button>
             </form>
 
@@ -314,8 +327,8 @@ export default function Login() {
                 </>
               )}
 
-              <button type="submit" className="btn btn-accent w-full mt-2">
-                Create {regRole === 'admin' ? 'Administrator' : regRole === 'lecturer' ? 'Lecturer' : regRole === 'student_head' ? 'Student Head' : 'Student'} Account
+              <button type="submit" className="btn btn-accent w-full mt-2" disabled={isSubmitting}>
+                {isSubmitting ? 'Creating Account...' : `Create ${regRole === 'admin' ? 'Administrator' : regRole === 'lecturer' ? 'Lecturer' : regRole === 'student_head' ? 'Student Head' : 'Student'} Account`}
               </button>
             </form>
 

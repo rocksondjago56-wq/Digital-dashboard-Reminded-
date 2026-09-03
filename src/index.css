@@ -64,12 +64,16 @@ body {
   overflow-x: hidden;
   line-height: 1.6;
   background-image:
-    linear-gradient(rgba(15, 23, 42, 0.66), rgba(15, 23, 42, 0.66)),
+    linear-gradient(rgba(10, 25, 47, 0.32), rgba(10, 25, 47, 0.42)),
     url('./IMG_6849-background-rotated.jpg');
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
   background-attachment: fixed;
+}
+
+img, video, canvas, svg {
+  max-width: 100%;
 }
 
 #root {
@@ -171,6 +175,13 @@ label {
   border: none;
   cursor: pointer;
   transition: var(--transition-smooth);
+}
+
+.btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 .btn-primary {
@@ -308,6 +319,11 @@ label {
 /* Responsive Utility Helper */
 .mobile-only { display: none; }
 @media (max-width: 768px) {
+  body {
+    background-attachment: scroll;
+    background-position: center top;
+  }
+
   .mobile-only { display: block; }
   .desktop-only { display: none; }
 
@@ -315,8 +331,18 @@ label {
     padding: 0 12px;
   }
 
+  .grid-2,
+  .grid-3,
+  .grid-main-sidebar {
+    gap: 16px;
+  }
+
   input, select, textarea {
     font-size: 16px;
+  }
+
+  label {
+    font-size: 0.78rem;
   }
 }
 
@@ -328,9 +354,19 @@ label {
   .btn {
     min-height: 44px;
     padding: 10px 16px;
+    width: 100%;
   }
 
   h1, h2, h3, p, span, td, th {
     overflow-wrap: anywhere;
   }
+
+  table {
+    width: 100%;
+  }
+
+  .mt-4 { margin-top: 20px; }
+  .mb-4 { margin-bottom: 20px; }
+  .mt-2 { margin-top: 12px; }
+  .mb-2 { margin-bottom: 12px; }
 }

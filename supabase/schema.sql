@@ -2,7 +2,7 @@
 -- New public registrations are intentionally created as students. Lecturer and
 -- administrator accounts must be approved by a department administrator.
 
-create type public.user_role as enum ('student', 'lecturer', 'admin');
+create type public.user_role as enum ('student', 'student_head', 'lecturer', 'admin');
 
 create table public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
@@ -12,7 +12,11 @@ create table public.profiles (
   department text not null default 'Graphic Design',
   year text,
   student_id text unique,
+  staff_id text unique,
+  designation text,
   courses text[] not null default '{}',
+  requested_role text check (requested_role in ('student', 'student_head', 'lecturer', 'admin')),
+  requested_courses text[] not null default '{}',
   profile_picture_url text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -63,13 +67,45 @@ create table public.deadline_completions (
 
 create or replace function public.handle_new_user()
 returns trigger language plpgsql security definer set search_path = public as $$
+declare
+  requested text := coalesce(nullif(new.raw_user_meta_data ->> 'requested_role', ''), 'student');
+  requested_courses text[] := case
+    when jsonb_typeof(new.raw_user_meta_data -> 'requested_courses') = 'array'
+    then array(select jsonb_array_elements_text(new.raw_user_meta_data -> 'requested_courses'))
+    else '{}'
+  end;
 begin
-  insert into public.profiles (id, name, email, role)
+  insert into public.profiles (
+    id,
+    name,
+    email,
+    role,
+    year,
+    student_id,
+    staff_id,
+    designation,
+    courses,
+    requested_role,
+    requested_courses
+  )
   values (
     new.id,
     coalesce(nullif(new.raw_user_meta_data ->> 'name', ''), split_part(new.email, '@', 1)),
     new.email,
-    'student'
+    case
+      when requested = 'student_head' then 'student_head'::public.user_role
+      else 'student'::public.user_role
+    end,
+    nullif(new.raw_user_meta_data ->> 'year', ''),
+    nullif(new.raw_user_meta_data ->> 'student_id', ''),
+    nullif(new.raw_user_meta_data ->> 'staff_id', ''),
+    nullif(new.raw_user_meta_data ->> 'designation', ''),
+    requested_courses,
+    case
+      when requested in ('student', 'student_head', 'lecturer', 'admin') then requested
+      else 'student'
+    end,
+    requested_courses
   );
   return new;
 end;

@@ -665,6 +665,10 @@
 }
 
 @media (max-width: 768px) {
+  .dashboard-content {
+    padding-bottom: 84px;
+  }
+
   .dashboard-hero {
     flex-direction: column;
     align-items: flex-start;
@@ -677,21 +681,21 @@
   
   .hero-stat-card {
     flex: 1;
+    min-width: 0;
   }
-  
+
   .deadline-card {
     flex-direction: column;
-    position: relative;
-    padding-bottom: 50px;
+    gap: 12px;
   }
-  
+
   .deadline-timing {
-    position: absolute;
-    bottom: 20px;
-    left: 56px;
     flex-direction: row;
     align-items: center;
+    justify-content: space-between;
     gap: 12px;
+    width: 100%;
+    min-width: 0;
   }
 
   .dashboard-section,
@@ -707,6 +711,15 @@
 
   .announcement-select {
     width: 100%;
+  }
+
+  .announcement-meta {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .event-sidebar-card {
+    align-items: flex-start;
   }
 
   .source-filter-bar {
@@ -759,14 +772,7 @@
   }
 
   .deadline-card {
-    padding: 16px 16px 54px;
-  }
-
-  .deadline-timing {
-    left: 16px;
-    right: 16px;
-    justify-content: space-between;
-    gap: 8px;
+    padding: 16px;
   }
 
   .deadline-meta-row,
@@ -780,6 +786,12 @@
     padding: 16px;
   }
 
+  .deadline-action-row,
+  .deadline-action-row button,
+  .announcement-card-item button {
+    width: 100%;
+  }
+
   .timetable-slot {
     flex-direction: column;
     gap: 6px;
@@ -791,6 +803,17 @@
 
   .hero-student-profile {
     align-items: flex-start;
+    gap: 12px;
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .student-head-actions button,
+  .class-group-quick-actions .btn {
+    width: 100%;
+  }
+
+  .event-sidebar-card {
     gap: 12px;
   }
 }

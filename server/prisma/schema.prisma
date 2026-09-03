@@ -1,0 +1,143 @@
+// Prisma schema for TTU Digital Dashboard
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  student
+  student_head
+  lecturer
+  admin
+}
+
+enum DeadlineType {
+  assignment
+  project
+  examination
+}
+
+enum AnnouncementCategory {
+  notice
+  update
+  calendar
+}
+
+model User {
+  id                String    @id @default(uuid())
+  name              String
+  email             String    @unique
+  passwordHash      String    @map("password_hash")
+  role              UserRole  @default(student)
+  department        String    @default("Graphic Design")
+  year              String?
+  studentId         String?   @unique @map("student_id")
+  staffId           String?   @unique @map("staff_id")
+  designation       String?
+  courses           String[]  @default([])
+  profilePictureUrl String?   @map("profile_picture_url")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  deadlines           Deadline[]
+  announcements       Announcement[]
+  events              Event[]
+  deadlineCompletions DeadlineCompletion[]
+
+  @@map("users")
+}
+
+model Deadline {
+  id             String       @id @default(uuid())
+  title          String
+  description    String
+  course         String
+  dueDate        DateTime     @map("due_date") @db.Date
+  type           DeadlineType
+  authorId       String       @map("author_id")
+  attachmentName String?      @map("attachment_name")
+  attachmentUrl  String?      @map("attachment_url")
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  // Relations
+  author      User                 @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  completions DeadlineCompletion[]
+
+  @@map("deadlines")
+}
+
+model Announcement {
+  id        String               @id @default(uuid())
+  title     String
+  content   String
+  category  AnnouncementCategory
+  isPinned  Boolean              @default(false) @map("is_pinned")
+  authorId  String               @map("author_id")
+  createdAt DateTime             @default(now()) @map("created_at")
+
+  // Relations
+  author User @relation(fields: [authorId], references: [id], onDelete: Restrict)
+
+  @@map("announcements")
+}
+
+model Event {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  location    String
+  eventDate   DateTime @map("event_date") @db.Date
+  eventTime   String?  @map("event_time")
+  type        String
+  organizer   String
+  authorId    String   @map("author_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  author User @relation(fields: [authorId], references: [id], onDelete: Restrict)
+
+  @@map("events")
+}
+
+model DeadlineCompletion {
+  studentId   String   @map("student_id")
+  deadlineId  String   @map("deadline_id")
+  completedAt DateTime @default(now()) @map("completed_at")
+
+  // Relations
+  student  User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  deadline Deadline @relation(fields: [deadlineId], references: [id], onDelete: Cascade)
+
+  @@id([studentId, deadlineId])
+  @@map("deadline_completions")
+}
+
+model TimetableSlot {
+  id     String @id @default(uuid())
+  day    String
+  time   String
+  course String
+  room   String
+  year   String @default("All Years")
+
+  @@map("timetable_slots")
+}
+
+model ClassWhatsAppGroup {
+  id         String   @id @default(uuid())
+  year       String   @unique
+  title      String
+  headName   String   @map("head_name")
+  headId     String   @map("head_id")
+  headPhone  String   @map("head_phone")
+  inviteLink String   @default("") @map("invite_link")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@map("class_whatsapp_groups")
+}

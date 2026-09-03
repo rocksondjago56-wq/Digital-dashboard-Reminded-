@@ -472,3 +472,73 @@
   color: #64748b;
   text-align: center;
 }
+
+@media (max-width: 560px) {
+  .whatsapp-widget-container {
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+  }
+
+  .whatsapp-floating-btn {
+    margin-left: auto;
+    padding: 12px 14px;
+  }
+
+  .whatsapp-modal {
+    position: fixed;
+    left: 10px;
+    right: 10px;
+    bottom: 72px;
+    width: auto;
+    max-width: none;
+    max-height: calc(100dvh - 90px);
+    border-radius: 14px;
+  }
+
+  .whatsapp-modal-body {
+    max-height: calc(100dvh - 240px);
+    padding: 14px;
+  }
+
+  .whatsapp-modal-header {
+    padding: 14px;
+  }
+
+  .whatsapp-header-brand h4 {
+    font-size: 14px;
+  }
+
+  .whatsapp-nav-tabs {
+    overflow-x: auto;
+  }
+
+  .whatsapp-tab-btn {
+    min-width: 96px;
+    flex: 0 0 auto;
+  }
+
+  .whatsapp-group-actions,
+  .whatsapp-btn-row,
+  .whatsapp-class-actions {
+    flex-direction: column;
+  }
+
+  .whatsapp-group-actions .btn,
+  .whatsapp-btn-row .btn,
+  .whatsapp-class-actions .btn {
+    width: 100%;
+  }
+}
+
+@media (max-width: 360px) {
+  .whatsapp-widget-container {
+    left: 8px;
+    right: 8px;
+  }
+
+  .whatsapp-modal {
+    left: 8px;
+    right: 8px;
+  }
+}

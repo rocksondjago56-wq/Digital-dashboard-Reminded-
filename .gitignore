@@ -12,6 +12,8 @@ dist
 dist-ssr
 *.local
 .env
+server/.env
+server/uploads
 
 # Editor directories and files
 .vscode/*
@@ -31,4 +33,5 @@ dist-ssr
 *.raw
 *.RAW
 src/IMG_6849*
+!src/IMG_6849-background-rotated.jpg
 src/b5e11250a3c85b2040cf2432f1ee98ddc556474e.png

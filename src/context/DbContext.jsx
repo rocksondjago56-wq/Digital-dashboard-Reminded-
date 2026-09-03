@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { DbContext } from './DbContextDefinition';
-import { isSupabaseConfigured, supabase } from '../lib/supabase';
+import { api, isApiAvailable, getToken, setToken, clearToken } from '../lib/api';
 import { createClassGroupTitle } from '../utils/whatsapp';
 
-// Mock Initial Data
+// ─── Mock / Fallback Data ───────────────────────────────────────────────────
+// Used when the backend server is not running (localStorage mode).
+
 const initialUsers = [
   { id: '1', email: 'admin@ttu.edu.gh', name: 'Dr. Rockson (Head of Admin)', role: 'admin', password: 'admin123', department: 'Graphic Design' },
   { id: '2', email: 'lecturer@ttu.edu.gh', name: 'Prof. Andrews K. Mensah', role: 'lecturer', password: 'lecturer123', department: 'Graphic Design', courses: ['Layout Design II', 'Vector Graphics I', 'Visual Portfolio Prep'] },
@@ -17,7 +19,7 @@ const initialDeadlines = [
     title: 'Layout & Page Design Project',
     description: 'Design and submit a 16-page magazine layout using Adobe InDesign. Export as PDF with print marks.',
     course: 'Layout Design II',
-    dueDate: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 4 days from now
+    dueDate: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     type: 'assignment',
     status: 'pending',
     author: 'Prof. Andrews K. Mensah',
@@ -34,7 +36,7 @@ const initialDeadlines = [
     title: 'Typography & Logo Presentation',
     description: 'Submit vector design concepts for the TTU Campus Beautification brand identity project.',
     course: 'Vector Graphics I',
-    dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 7 days from now
+    dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     type: 'project',
     status: 'pending',
     author: 'Prof. Andrews K. Mensah',
@@ -45,7 +47,7 @@ const initialDeadlines = [
     title: 'End of Semester Theory Exam',
     description: 'Written exam testing core layout grids, typesetting rules, and prepress processes.',
     course: 'Layout Design II',
-    dueDate: new Date(Date.now() + 12 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 12 days from now
+    dueDate: new Date(Date.now() + 12 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     type: 'examination',
     status: 'pending',
     author: 'Dr. Rockson (Head of Admin)',
@@ -145,6 +147,8 @@ const initialTimetable = [
   { id: 'tt5', day: 'Friday', time: '02:00 PM - 04:00 PM', course: 'Design Workshop Seminar', room: 'Auditorium', year: 'All Years' }
 ];
 
+// ─── localStorage Keys ──────────────────────────────────────────────────────
+
 const USERS_STORAGE_KEY = 'ttu_users';
 const CURRENT_USER_STORAGE_KEY = 'ttu_current_user';
 const TIMETABLE_STORAGE_KEY = 'ttu_timetable';
@@ -157,6 +161,8 @@ const sortTimetable = (items) => [...items].sort((a, b) => {
   return a.time.localeCompare(b.time);
 });
 
+// ─── localStorage Helpers ───────────────────────────────────────────────────
+
 const mergeSeedUsers = (savedUsers) => {
   const savedEmails = new Set(savedUsers.map(user => user.email?.toLowerCase()).filter(Boolean));
   const missingUsers = initialUsers.filter(user => !savedEmails.has(user.email.toLowerCase()));
@@ -168,7 +174,6 @@ const getSavedUsers = () => {
     const savedUsers = localStorage.getItem(USERS_STORAGE_KEY);
     return savedUsers ? JSON.parse(savedUsers) : null;
   } catch {
-    // A corrupt browser record should not prevent users from accessing the app.
     localStorage.removeItem(USERS_STORAGE_KEY);
     return null;
   }
@@ -184,6 +189,16 @@ const getSavedCurrentUser = () => {
   }
 };
 
+const parseCourses = (courses) => {
+  if (Array.isArray(courses)) return courses;
+  if (typeof courses === 'string') {
+    return courses.split(',').map(course => course.trim()).filter(Boolean);
+  }
+  return [];
+};
+
+// ─── Provider Component ─────────────────────────────────────────────────────
+
 export const DbProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(null);
   const [users, setUsers] = useState([]);
@@ -194,201 +209,33 @@ export const DbProvider = ({ children }) => {
   const [timetable, setTimetable] = useState([]);
   const [classGroups, setClassGroups] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [useApi, setUseApi] = useState(false); // true when backend is available
 
-  // Initialize data from localStorage or fallback
-  useEffect(() => {
-    const localUsers = getSavedUsers();
-    const localDeadlines = localStorage.getItem('ttu_deadlines');
-    const localEvents = localStorage.getItem('ttu_events');
-    const localAnnouncements = localStorage.getItem('ttu_announcements');
-    const localNotifications = localStorage.getItem('ttu_notifications');
-    const localTimetable = localStorage.getItem(TIMETABLE_STORAGE_KEY);
-    const localClassGroups = localStorage.getItem(CLASS_GROUPS_STORAGE_KEY);
-    const localCurrentUser = getSavedCurrentUser();
-
-    if (localUsers) {
-      const mergedUsers = mergeSeedUsers(localUsers);
-      setUsers(mergedUsers);
-      if (mergedUsers.length !== localUsers.length) {
-        localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(mergedUsers));
-      }
-    }
-    else {
-      setUsers(initialUsers);
-      localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(initialUsers));
-    }
-
-    if (localDeadlines) setDeadlines(JSON.parse(localDeadlines));
-    else {
-      setDeadlines(initialDeadlines);
-      localStorage.setItem('ttu_deadlines', JSON.stringify(initialDeadlines));
-    }
-
-    if (localEvents) setEvents(JSON.parse(localEvents));
-    else {
-      setEvents(initialEvents);
-      localStorage.setItem('ttu_events', JSON.stringify(initialEvents));
-    }
-
-    if (localAnnouncements) setAnnouncements(JSON.parse(localAnnouncements));
-    else {
-      setAnnouncements(initialAnnouncements);
-      localStorage.setItem('ttu_announcements', JSON.stringify(initialAnnouncements));
-    }
-
-    if (localNotifications) setNotifications(JSON.parse(localNotifications));
-    else {
-      setNotifications(initialNotifications);
-      localStorage.setItem('ttu_notifications', JSON.stringify(initialNotifications));
-    }
-
-    if (localTimetable) setTimetable(sortTimetable(JSON.parse(localTimetable)));
-    else {
-      setTimetable(initialTimetable);
-      localStorage.setItem(TIMETABLE_STORAGE_KEY, JSON.stringify(initialTimetable));
-    }
-
-    if (localClassGroups) setClassGroups(JSON.parse(localClassGroups));
-    else {
-      setClassGroups([]);
-      localStorage.setItem(CLASS_GROUPS_STORAGE_KEY, JSON.stringify([]));
-    }
-
-    if (localCurrentUser) setCurrentUser(localCurrentUser);
-
-    setLoading(false);
-  }, []);
-
-  const refreshRemoteData = async () => {
-    if (!isSupabaseConfigured) return;
-
-    const [profilesResult, deadlinesResult, announcementsResult, eventsResult, completionsResult] = await Promise.all([
-      supabase.from('profiles').select('*'),
-      supabase.from('deadlines').select('*').order('due_date', { ascending: true }),
-      supabase.from('announcements').select('*').order('created_at', { ascending: false }),
-      supabase.from('events').select('*').order('event_date', { ascending: true }),
-      supabase.from('deadline_completions').select('*')
-    ]);
-
-    if (profilesResult.error) return;
-    const profiles = profilesResult.data || [];
-    const profileById = new Map(profiles.map(profile => [profile.id, profile]));
-    const mappedUsers = profiles.map(profile => ({
-      id: profile.id,
-      name: profile.name,
-      email: profile.email,
-      role: profile.role,
-      department: profile.department,
-      year: profile.year,
-      studentId: profile.student_id,
-      indexNumber: profile.student_id,
-      courses: profile.courses || [],
-      profilePic: profile.profile_picture_url,
-      completedDeadlines: (completionsResult.data || [])
-        .filter(completion => completion.student_id === profile.id)
-        .map(completion => completion.deadline_id)
-    }));
-
-    setUsers(mappedUsers);
-    if (!deadlinesResult.error) {
-      setDeadlines((deadlinesResult.data || []).map(deadline => {
-        const author = profileById.get(deadline.author_id);
-        return {
-          id: deadline.id,
-          title: deadline.title,
-          description: deadline.description,
-          course: deadline.course,
-          dueDate: deadline.due_date,
-          type: deadline.type,
-          status: 'pending',
-          author: author?.name || 'Department',
-          authorRole: author?.role || 'lecturer',
-          attachment: deadline.attachment_url ? { name: deadline.attachment_name, dataUrl: deadline.attachment_url } : null
-        };
-      }));
-    }
-    if (!announcementsResult.error) {
-      setAnnouncements((announcementsResult.data || []).map(announcement => {
-        const author = profileById.get(announcement.author_id);
-        return {
-          id: announcement.id,
-          title: announcement.title,
-          content: announcement.content,
-          category: announcement.category,
-          isPinned: announcement.is_pinned,
-          date: announcement.created_at.slice(0, 10),
-          author: author?.name || 'Department',
-          authorRole: author?.role || 'lecturer'
-        };
-      }));
-    }
-    if (!eventsResult.error) {
-      setEvents((eventsResult.data || []).map(event => {
-        const author = profileById.get(event.author_id);
-        return {
-          id: event.id,
-          title: event.title,
-          description: event.description,
-          location: event.location,
-          date: event.event_date,
-          time: event.event_time,
-          type: event.type,
-          organizer: event.organizer,
-          author: author?.name || 'Department',
-          authorRole: author?.role || 'admin'
-        };
-      }));
-    }
-  };
-
-  useEffect(() => {
-    if (isSupabaseConfigured) refreshRemoteData();
-  }, []);
-
-  // Supabase keeps the authenticated session itself. Restore the associated
-  // protected department profile whenever the application is opened again.
-  useEffect(() => {
-    if (!isSupabaseConfigured) return undefined;
-
-    const loadProfile = async (authUser) => {
-      if (!authUser) {
-        setCurrentUser(getSavedCurrentUser());
-        return;
-      }
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', authUser.id)
-        .single();
-
-      if (!profile) {
-        setCurrentUser(getSavedCurrentUser());
-        return;
-      }
-      setCurrentUser({
-        id: profile.id,
-        name: profile.name,
-        email: profile.email,
-        role: profile.role,
-        department: profile.department,
-        year: profile.year,
-        studentId: profile.student_id,
-        indexNumber: profile.student_id,
-        courses: profile.courses || [],
-        profilePic: profile.profile_picture_url
-      });
+  // ─── Notifications (always local) ──────────────────────────────────────
+  const addNotification = useCallback((text) => {
+    const newNotif = {
+      id: `n_${Date.now()}`,
+      text,
+      timestamp: new Date().toISOString(),
+      isRead: false
     };
-
-    supabase.auth.getUser().then(({ data }) => loadProfile(data.user));
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      loadProfile(session?.user);
+    setNotifications(prev => {
+      const updated = [newNotif, ...prev];
+      localStorage.setItem('ttu_notifications', JSON.stringify(updated));
+      return updated;
     });
-
-    return () => subscription.unsubscribe();
   }, []);
 
-  // Synchronizers
+  const markAllNotificationsAsRead = useCallback(() => {
+    setNotifications(prev => {
+      const updated = prev.map(n => ({ ...n, isRead: true }));
+      localStorage.setItem('ttu_notifications', JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
+  // ─── localStorage Sync Helpers ─────────────────────────────────────────
+
   const syncUsers = (data) => {
     setUsers(data);
     localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(data));
@@ -409,11 +256,6 @@ export const DbProvider = ({ children }) => {
     localStorage.setItem('ttu_announcements', JSON.stringify(data));
   };
 
-  const syncNotifications = (data) => {
-    setNotifications(data);
-    localStorage.setItem('ttu_notifications', JSON.stringify(data));
-  };
-
   const syncTimetable = (data) => {
     const sorted = sortTimetable(data);
     setTimetable(sorted);
@@ -426,14 +268,162 @@ export const DbProvider = ({ children }) => {
     localStorage.setItem(CLASS_GROUPS_STORAGE_KEY, JSON.stringify(sorted));
   };
 
-  // Auth Operations
+  // ─── Fetch All Remote Data (API mode) ──────────────────────────────────
+
+  const refreshRemoteData = useCallback(async () => {
+    try {
+      const [deadlinesRes, announcementsRes, eventsRes, timetableRes, classGroupsRes, usersRes] = await Promise.all([
+        api.deadlines.list(),
+        api.announcements.list(),
+        api.events.list(),
+        api.timetable.list(),
+        api.timetable.listClassGroups(),
+        api.users.list()
+      ]);
+
+      if (deadlinesRes.success) setDeadlines(deadlinesRes.deadlines);
+      if (announcementsRes.success) setAnnouncements(announcementsRes.announcements);
+      if (eventsRes.success) setEvents(eventsRes.events);
+      if (timetableRes.success) setTimetable(timetableRes.timetable);
+      if (classGroupsRes.success) setClassGroups(classGroupsRes.classGroups);
+      if (usersRes.success) setUsers(usersRes.users);
+    } catch (error) {
+      console.warn('Failed to refresh remote data:', error);
+    }
+  }, []);
+
+  // ─── Initialization ───────────────────────────────────────────────────
+
+  useEffect(() => {
+    const init = async () => {
+      // Check if backend API is available
+      const apiReady = await isApiAvailable();
+      setUseApi(apiReady);
+
+      if (apiReady) {
+        console.log('🟢 Backend API detected — using PostgreSQL database');
+
+        // Check for existing token (auto-login)
+        const token = getToken();
+        if (token) {
+          try {
+            const meResult = await api.auth.me();
+            if (meResult.success) {
+              setCurrentUser(meResult.user);
+            }
+          } catch {
+            clearToken(); // Token expired or invalid
+          }
+        }
+
+        // Load all data from the API
+        try {
+          await refreshRemoteData();
+        } catch {
+          console.warn('Could not load data from API');
+        }
+
+        // Load notifications from localStorage (they're always local)
+        const localNotifications = localStorage.getItem('ttu_notifications');
+        if (localNotifications) setNotifications(JSON.parse(localNotifications));
+        else setNotifications(initialNotifications);
+      } else {
+        console.log('🟡 Backend API not available — using localStorage fallback');
+
+        // Original localStorage initialization
+        const localUsers = getSavedUsers();
+        const localDeadlines = localStorage.getItem('ttu_deadlines');
+        const localEvents = localStorage.getItem('ttu_events');
+        const localAnnouncements = localStorage.getItem('ttu_announcements');
+        const localNotifications = localStorage.getItem('ttu_notifications');
+        const localTimetable = localStorage.getItem(TIMETABLE_STORAGE_KEY);
+        const localClassGroups = localStorage.getItem(CLASS_GROUPS_STORAGE_KEY);
+        const localCurrentUser = getSavedCurrentUser();
+
+        if (localUsers) {
+          const mergedUsers = mergeSeedUsers(localUsers);
+          setUsers(mergedUsers);
+          if (mergedUsers.length !== localUsers.length) {
+            localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(mergedUsers));
+          }
+        } else {
+          setUsers(initialUsers);
+          localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(initialUsers));
+        }
+
+        if (localDeadlines) setDeadlines(JSON.parse(localDeadlines));
+        else {
+          setDeadlines(initialDeadlines);
+          localStorage.setItem('ttu_deadlines', JSON.stringify(initialDeadlines));
+        }
+
+        if (localEvents) setEvents(JSON.parse(localEvents));
+        else {
+          setEvents(initialEvents);
+          localStorage.setItem('ttu_events', JSON.stringify(initialEvents));
+        }
+
+        if (localAnnouncements) setAnnouncements(JSON.parse(localAnnouncements));
+        else {
+          setAnnouncements(initialAnnouncements);
+          localStorage.setItem('ttu_announcements', JSON.stringify(initialAnnouncements));
+        }
+
+        if (localNotifications) setNotifications(JSON.parse(localNotifications));
+        else {
+          setNotifications(initialNotifications);
+          localStorage.setItem('ttu_notifications', JSON.stringify(initialNotifications));
+        }
+
+        if (localTimetable) setTimetable(sortTimetable(JSON.parse(localTimetable)));
+        else {
+          setTimetable(initialTimetable);
+          localStorage.setItem(TIMETABLE_STORAGE_KEY, JSON.stringify(initialTimetable));
+        }
+
+        if (localClassGroups) setClassGroups(JSON.parse(localClassGroups));
+        else {
+          setClassGroups([]);
+          localStorage.setItem(CLASS_GROUPS_STORAGE_KEY, JSON.stringify([]));
+        }
+
+        if (localCurrentUser) setCurrentUser(localCurrentUser);
+      }
+
+      setLoading(false);
+    };
+
+    init();
+  }, [refreshRemoteData]);
+
+  // ─── Auth Operations ──────────────────────────────────────────────────
+
   const login = async (identifier, password) => {
+    // API Mode
+    if (useApi) {
+      try {
+        const result = await api.auth.login(identifier, password);
+        if (result.success) {
+          setToken(result.token);
+          setCurrentUser(result.user);
+          await refreshRemoteData();
+          addNotification(`User ${result.user.name} logged in successfully.`);
+          return { success: true, user: result.user };
+        }
+        return { success: false, message: result.error || 'Login failed.' };
+      } catch (error) {
+        return { success: false, message: error.message };
+      }
+    }
+
+    // localStorage Mode (original logic)
     const term = identifier.trim().toLowerCase();
     const savedUsers = getSavedUsers();
     const accountRecords = savedUsers || users;
 
     const user = accountRecords.find(u =>
       u.email?.toLowerCase() === term ||
+      u.name?.toLowerCase() === term ||
       (u.studentId && u.studentId.toLowerCase() === term) ||
       (u.indexNumber && u.indexNumber.toLowerCase() === term) ||
       (u.staffId && u.staffId.toLowerCase() === term)
@@ -442,6 +432,11 @@ export const DbProvider = ({ children }) => {
     if (user) {
       const expectedPassword = user.password || `${user.role}123`;
       if (password === expectedPassword) {
+        const updatedUsers = [
+          ...accountRecords.filter(u => u.email?.toLowerCase() !== user.email.toLowerCase()),
+          user
+        ];
+        syncUsers(updatedUsers);
         setCurrentUser(user);
         localStorage.setItem(CURRENT_USER_STORAGE_KEY, JSON.stringify(user));
         addNotification(`User ${user.name} logged in successfully.`);
@@ -450,47 +445,34 @@ export const DbProvider = ({ children }) => {
       return { success: false, message: 'Incorrect password.' };
     }
 
-    if (isSupabaseConfigured && term.includes('@')) {
-      try {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: term,
-          password
-        });
-
-        if (!error && data.user) {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', data.user.id)
-            .single();
-
-          if (profile) {
-            const user = {
-              id: profile.id,
-              name: profile.name,
-              email: profile.email,
-              role: profile.role,
-              department: profile.department,
-              year: profile.year,
-              studentId: profile.student_id,
-              indexNumber: profile.student_id,
-              courses: profile.courses || [],
-              profilePic: profile.profile_picture_url
-            };
-            setCurrentUser(user);
-            localStorage.setItem(CURRENT_USER_STORAGE_KEY, JSON.stringify(user));
-            return { success: true, user };
-          }
-        }
-      } catch (e) {
-        console.warn('Supabase auth signIn error, checking local records:', e);
-      }
-    }
-
-    return { success: false, message: 'User or Index Number not found in department records.' };
+    return { success: false, message: 'Account not found. Use your email, full name, index number, or staff ID.' };
   };
 
   const signUp = async (name, email, password, role = 'student', extraFields = {}) => {
+    // API Mode
+    if (useApi) {
+      try {
+        const result = await api.auth.signup({
+          name,
+          email,
+          password,
+          role,
+          ...extraFields
+        });
+
+        if (result.success) {
+          setToken(result.token);
+          setCurrentUser(result.user);
+          addNotification(`New user registered: ${result.user.name} (${result.user.role})`);
+          return { success: true, user: result.user, message: result.message };
+        }
+        return { success: false, message: result.error || 'Signup failed.' };
+      } catch (error) {
+        return { success: false, message: error.message };
+      }
+    }
+
+    // localStorage Mode (original logic)
     const emailLower = email.trim().toLowerCase();
     const savedUsers = getSavedUsers();
     const accountRecords = savedUsers || users;
@@ -500,148 +482,336 @@ export const DbProvider = ({ children }) => {
       return { success: false, message: 'This email is already registered. Use Sign In instead.' };
     }
 
-    const createAndSetLocalUser = () => {
-      const newUser = {
-        id: `u_${Date.now()}`,
-        name: name.trim(),
-        email: emailLower,
-        password,
-        role,
-        department: 'Graphic Design',
-        ...extraFields
-      };
-
-      if (role === 'student' || role === 'student_head') {
-        newUser.completedDeadlines = [];
-        newUser.year = extraFields.year || 'Year 1';
-        newUser.studentId = extraFields.studentId || `04${Math.floor(10000000 + Math.random() * 90000000)}`;
-        newUser.indexNumber = newUser.studentId;
-      } else if (role === 'lecturer') {
-        newUser.courses = extraFields.courses
-          ? (typeof extraFields.courses === 'string' ? extraFields.courses.split(',').map(s => s.trim()).filter(Boolean) : extraFields.courses)
-          : ['General Design'];
-        newUser.staffId = extraFields.staffId || `LEC-${Math.floor(1000 + Math.random() * 9000)}`;
-      } else if (role === 'admin') {
-        newUser.designation = extraFields.designation || 'Department Administrator';
-        newUser.staffId = extraFields.staffId || `ADM-${Math.floor(1000 + Math.random() * 9000)}`;
-      }
-
-      const updatedUsers = [...accountRecords.filter(u => u.email.toLowerCase() !== emailLower), newUser];
-      syncUsers(updatedUsers);
-      setCurrentUser(newUser);
-      localStorage.setItem(CURRENT_USER_STORAGE_KEY, JSON.stringify(newUser));
-      addNotification(`New user registered: ${name} (${role})`);
-      return newUser;
+    const newUser = {
+      id: `u_${Date.now()}`,
+      name: name.trim(),
+      email: emailLower,
+      password,
+      role,
+      department: 'Graphic Design',
+      ...extraFields,
+      completedDeadlines: (role === 'student' || role === 'student_head') ? [] : undefined,
+      year: extraFields.year || (role === 'student' || role === 'student_head' ? 'Year 1' : undefined),
+      studentId: extraFields.studentId || extraFields.indexNumber || (role === 'student' || role === 'student_head' ? `04${Math.floor(10000000 + Math.random() * 90000000)}` : undefined),
+      courses: parseCourses(extraFields.courses).length ? parseCourses(extraFields.courses) : (role === 'lecturer' ? ['General Design'] : [])
     };
 
-    if (isSupabaseConfigured) {
-      try {
-        const { data, error } = await supabase.auth.signUp({
-          email: emailLower,
-          password,
-          options: {
-            data: {
-              name: name.trim(),
-              requested_role: role,
-              designation: extraFields.designation || '',
-              staff_id: extraFields.staffId || '',
-              requested_courses: role === 'lecturer'
-                ? (extraFields.courses || '').split(',').map(course => course.trim()).filter(Boolean)
-                : []
-            }
-          }
-        });
-
-        if (error) {
-          console.warn('Supabase auth signUp error, activating local fallback:', error.message);
-          // If rate limit or other provider error occurs, create locally so the user is never locked out
-          const localUser = createAndSetLocalUser();
-          return {
-            success: true,
-            user: localUser,
-            message: `${role.charAt(0).toUpperCase() + role.slice(1)} account created and signed in successfully!`
-          };
-        }
-
-        // Successfully created via Supabase or pending confirmation -> establish session locally too
-        const localUser = createAndSetLocalUser();
-        return {
-          success: true,
-          user: localUser,
-          message: `${role.charAt(0).toUpperCase() + role.slice(1)} account created successfully!`
-        };
-      } catch (err) {
-        console.warn('Supabase exception, activating local fallback:', err);
-        const localUser = createAndSetLocalUser();
-        return { success: true, user: localUser, message: 'Account created successfully!' };
-      }
-    }
-
-    const newUser = createAndSetLocalUser();
+    const updatedUsers = [...accountRecords, newUser];
+    syncUsers(updatedUsers);
+    setCurrentUser(newUser);
+    localStorage.setItem(CURRENT_USER_STORAGE_KEY, JSON.stringify(newUser));
+    addNotification(`New local user registered: ${newUser.name} (${newUser.role})`);
     return { success: true, user: newUser };
   };
 
   const logout = async () => {
-    localStorage.removeItem(CURRENT_USER_STORAGE_KEY);
-
-    if (isSupabaseConfigured) {
-      await supabase.auth.signOut();
-      setCurrentUser(null);
-      return;
-    }
-
     if (currentUser) {
       addNotification(`User ${currentUser.name} logged out.`);
     }
+    clearToken();
+    localStorage.removeItem(CURRENT_USER_STORAGE_KEY);
     setCurrentUser(null);
   };
 
-  // Notifications Helpers
-  const addNotification = (text) => {
-    const newNotif = {
-      id: `n_${Date.now()}`,
-      text,
-      timestamp: new Date().toISOString(),
-      isRead: false
+  // ─── Deadlines ────────────────────────────────────────────────────────
+
+  const addDeadline = async (deadline) => {
+    if (useApi) {
+      try {
+        const result = await api.deadlines.create(deadline);
+        if (result.success) {
+          await refreshRemoteData();
+          addNotification(`New deadline added: "${deadline.title}" due on ${deadline.dueDate}.`);
+        }
+        return result;
+      } catch (error) {
+        return { success: false, message: error.message };
+      }
+    }
+
+    const newDeadline = {
+      id: `d_${Date.now()}`,
+      author: currentUser ? currentUser.name : 'Administration',
+      authorRole: currentUser ? currentUser.role : 'admin',
+      ...deadline,
+      status: 'pending'
     };
-    const updated = [newNotif, ...notifications];
-    syncNotifications(updated);
+    syncDeadlines([newDeadline, ...deadlines]);
+    addNotification(`New deadline added by ${newDeadline.author}: "${newDeadline.title}" due on ${newDeadline.dueDate}.`);
   };
 
-  const markAllNotificationsAsRead = () => {
-    const updated = notifications.map(n => ({ ...n, isRead: true }));
-    syncNotifications(updated);
+  const updateDeadline = async (id, updatedFields) => {
+    if (useApi) {
+      try {
+        const result = await api.deadlines.update(id, updatedFields);
+        if (result.success) await refreshRemoteData();
+        return result;
+      } catch (error) {
+        return { success: false, message: error.message };
+      }
+    }
+
+    const updated = deadlines.map(d => d.id === id ? { ...d, ...updatedFields } : d);
+    syncDeadlines(updated);
+    addNotification(`Deadline updated: "${updatedFields.title || id}".`);
   };
 
-  // Timetable Operations
-  const addTimetableSlot = (slot) => {
-    const newSlot = {
-      id: `tt_${Date.now()}`,
-      year: 'All Years',
-      ...slot
+  const deleteDeadline = async (id) => {
+    if (useApi) {
+      try {
+        const result = await api.deadlines.delete(id);
+        if (result.success) await refreshRemoteData();
+        return result;
+      } catch (error) {
+        return { success: false, message: error.message };
+      }
+    }
+
+    const deadlineToDelete = deadlines.find(d => d.id === id);
+    syncDeadlines(deadlines.filter(d => d.id !== id));
+    if (deadlineToDelete) {
+      addNotification(`Deadline deleted: "${deadlineToDelete.title}".`);
+    }
+  };
+
+  const toggleDeadlineCompleted = async (deadlineId) => {
+    if (!currentUser || !['student', 'student_head'].includes(currentUser.role)) return;
+
+    if (useApi) {
+      try {
+        const result = await api.deadlines.toggleComplete(deadlineId);
+        if (result.success) {
+          setCurrentUser(prev => ({ ...prev, completedDeadlines: result.completedDeadlines }));
+        }
+        return result;
+      } catch (error) {
+        return { success: false, message: error.message };
+      }
+    }
+
+    const updatedUsers = users.map(u => {
+      if (u.id === currentUser.id) {
+        const completed = u.completedDeadlines || [];
+        const isAlreadyDone = completed.includes(deadlineId);
+        const updatedCompleted = isAlreadyDone
+          ? completed.filter(id => id !== deadlineId)
+          : [...completed, deadlineId];
+
+        const updatedUser = { ...u, completedDeadlines: updatedCompleted };
+        setCurrentUser(updatedUser);
+        localStorage.setItem(CURRENT_USER_STORAGE_KEY, JSON.stringify(updatedUser));
+        return updatedUser;
+      }
+      return u;
+    });
+    syncUsers(updatedUsers);
+  };
+
+  // ─── Events ───────────────────────────────────────────────────────────
+
+  const addEvent = async (event) => {
+    if (useApi) {
+      try {
+        const result = await api.events.create(event);
+        if (result.success) {
+          await refreshRemoteData();
+          addNotification(`New event published: "${event.title}" scheduled for ${event.date}.`);
+        }
+        return result;
+      } catch (error) {
+        return { success: false, message: error.message };
+      }
+    }
+
+    const newEvent = {
+      id: `e_${Date.now()}`,
+      author: currentUser ? currentUser.name : 'Administration',
+      authorRole: currentUser ? currentUser.role : 'admin',
+      ...event
     };
+    syncEvents([newEvent, ...events]);
+    addNotification(`New event published by ${newEvent.author}: "${newEvent.title}" scheduled for ${newEvent.date}.`);
+  };
+
+  const updateEvent = async (id, updatedFields) => {
+    if (useApi) {
+      try {
+        const result = await api.events.update(id, updatedFields);
+        if (result.success) await refreshRemoteData();
+        return result;
+      } catch (error) {
+        return { success: false, message: error.message };
+      }
+    }
+
+    const updated = events.map(e => e.id === id ? { ...e, ...updatedFields } : e);
+    syncEvents(updated);
+    addNotification(`Event updated: "${updatedFields.title || id}".`);
+  };
+
+  const deleteEvent = async (id) => {
+    if (useApi) {
+      try {
+        const result = await api.events.delete(id);
+        if (result.success) await refreshRemoteData();
+        return result;
+      } catch (error) {
+        return { success: false, message: error.message };
+      }
+    }
+
+    const eventToDelete = events.find(e => e.id === id);
+    syncEvents(events.filter(e => e.id !== id));
+    if (eventToDelete) {
+      addNotification(`Event deleted: "${eventToDelete.title}".`);
+    }
+  };
+
+  // ─── Announcements ───────────────────────────────────────────────────
+
+  const addAnnouncement = async (announcement) => {
+    if (useApi) {
+      try {
+        const result = await api.announcements.create(announcement);
+        if (result.success) {
+          await refreshRemoteData();
+          addNotification(`New announcement posted: "${announcement.title}".`);
+        }
+        return result;
+      } catch (error) {
+        return { success: false, message: error.message };
+      }
+    }
+
+    const newAnn = {
+      id: `a_${Date.now()}`,
+      author: currentUser ? currentUser.name : 'Administration',
+      authorRole: currentUser ? currentUser.role : 'admin',
+      date: new Date().toISOString().split('T')[0],
+      ...announcement
+    };
+    syncAnnouncements([newAnn, ...announcements]);
+    addNotification(`New announcement posted by ${newAnn.author}: "${newAnn.title}".`);
+  };
+
+  const updateAnnouncement = async (id, updatedFields) => {
+    if (useApi) {
+      try {
+        const result = await api.announcements.update(id, updatedFields);
+        if (result.success) await refreshRemoteData();
+        return result;
+      } catch (error) {
+        return { success: false, message: error.message };
+      }
+    }
+
+    const updated = announcements.map(a => a.id === id ? { ...a, ...updatedFields } : a);
+    syncAnnouncements(updated);
+    addNotification(`Announcement updated: "${updatedFields.title || id}".`);
+  };
+
+  const deleteAnnouncement = async (id) => {
+    if (useApi) {
+      try {
+        const result = await api.announcements.delete(id);
+        if (result.success) await refreshRemoteData();
+        return result;
+      } catch (error) {
+        return { success: false, message: error.message };
+      }
+    }
+
+    const annToDelete = announcements.find(a => a.id === id);
+    syncAnnouncements(announcements.filter(a => a.id !== id));
+    if (annToDelete) {
+      addNotification(`Announcement deleted: "${annToDelete.title}".`);
+    }
+  };
+
+  // ─── Timetable ────────────────────────────────────────────────────────
+
+  const addTimetableSlot = async (slot) => {
+    if (useApi) {
+      try {
+        const result = await api.timetable.create({ year: 'All Years', ...slot });
+        if (result.success) {
+          await refreshRemoteData();
+          addNotification(`Timetable updated: ${slot.course} added on ${slot.day}.`);
+        }
+        return result;
+      } catch (error) {
+        return { success: false, message: error.message };
+      }
+    }
+
+    const newSlot = { id: `tt_${Date.now()}`, year: 'All Years', ...slot };
     syncTimetable([...timetable, newSlot]);
     addNotification(`Timetable updated: ${newSlot.course} added on ${newSlot.day}.`);
   };
 
-  const updateTimetableSlot = (id, updatedFields) => {
-    const updated = timetable.map(slot => (
-      slot.id === id ? { ...slot, ...updatedFields } : slot
-    ));
+  const updateTimetableSlot = async (id, updatedFields) => {
+    if (useApi) {
+      try {
+        const result = await api.timetable.update(id, updatedFields);
+        if (result.success) {
+          await refreshRemoteData();
+          addNotification(`Timetable updated: ${updatedFields.course || id}.`);
+        }
+        return result;
+      } catch (error) {
+        return { success: false, message: error.message };
+      }
+    }
+
+    const updated = timetable.map(s => s.id === id ? { ...s, ...updatedFields } : s);
     syncTimetable(updated);
     addNotification(`Timetable updated: ${updatedFields.course || id}.`);
   };
 
-  const deleteTimetableSlot = (id) => {
-    const slotToDelete = timetable.find(slot => slot.id === id);
-    syncTimetable(timetable.filter(slot => slot.id !== id));
+  const deleteTimetableSlot = async (id) => {
+    if (useApi) {
+      try {
+        const result = await api.timetable.delete(id);
+        if (result.success) await refreshRemoteData();
+        return result;
+      } catch (error) {
+        return { success: false, message: error.message };
+      }
+    }
+
+    const slotToDelete = timetable.find(s => s.id === id);
+    syncTimetable(timetable.filter(s => s.id !== id));
     if (slotToDelete) {
       addNotification(`Timetable class removed: ${slotToDelete.course}.`);
     }
   };
 
-  // WhatsApp Class Group Operations
-  const saveClassWhatsAppGroup = (group) => {
+  // ─── WhatsApp Class Groups ────────────────────────────────────────────
+
+  const saveClassWhatsAppGroup = async (group) => {
+    if (useApi) {
+      try {
+        const year = group.year || currentUser?.year || 'Year 1';
+        const result = await api.timetable.saveClassGroup({
+          year,
+          title: createClassGroupTitle(year),
+          headName: group.headName || currentUser?.name || 'Class Head',
+          headId: group.headId || currentUser?.id || '',
+          headPhone: group.headPhone || '',
+          inviteLink: group.inviteLink || ''
+        });
+        if (result.success) {
+          await refreshRemoteData();
+          addNotification(`${result.group.title} WhatsApp contact updated.`);
+        }
+        return result.group;
+      } catch (error) {
+        console.error('Save class group error:', error);
+        return null;
+      }
+    }
+
+    // localStorage fallback
     const year = group.year || currentUser?.year || 'Year 1';
     const cleanPhone = (group.headPhone || '').replace(/[^0-9]/g, '');
     const savedGroup = {
@@ -663,7 +833,17 @@ export const DbProvider = ({ children }) => {
     return savedGroup;
   };
 
-  const deleteClassWhatsAppGroup = (id) => {
+  const deleteClassWhatsAppGroup = async (id) => {
+    if (useApi) {
+      try {
+        const result = await api.timetable.deleteClassGroup(id);
+        if (result.success) await refreshRemoteData();
+        return result;
+      } catch (error) {
+        return { success: false, message: error.message };
+      }
+    }
+
     const groupToDelete = classGroups.find(group => group.id === id);
     syncClassGroups(classGroups.filter(group => group.id !== id));
     if (groupToDelete) {
@@ -671,213 +851,25 @@ export const DbProvider = ({ children }) => {
     }
   };
 
-  // Deadlines Operations (CRUD)
-  const addDeadline = (deadline) => {
-    if (isSupabaseConfigured) {
-      return supabase.from('deadlines').insert({
-        title: deadline.title,
-        description: deadline.description,
-        course: deadline.course,
-        due_date: deadline.dueDate,
-        type: deadline.type,
-        author_id: currentUser.id,
-        attachment_name: deadline.attachment?.name || null,
-        attachment_url: deadline.attachment?.dataUrl || null
-      }).then(async ({ error }) => {
-        if (!error) await refreshRemoteData();
-        return { success: !error, message: error?.message };
-      });
-    }
-    const newDeadline = {
-      id: `d_${Date.now()}`,
-      author: currentUser ? currentUser.name : 'Administration',
-      authorRole: currentUser ? currentUser.role : 'admin',
-      ...deadline,
-      status: 'pending'
-    };
-    const updated = [newDeadline, ...deadlines];
-    syncDeadlines(updated);
-    addNotification(`New deadline added by ${newDeadline.author}: "${newDeadline.title}" due on ${newDeadline.dueDate}.`);
-  };
+  // ─── User Admin ───────────────────────────────────────────────────────
 
-  const updateDeadline = (id, updatedFields) => {
-    if (isSupabaseConfigured) {
-      return supabase.from('deadlines').update({
-        title: updatedFields.title,
-        description: updatedFields.description,
-        course: updatedFields.course,
-        due_date: updatedFields.dueDate,
-        type: updatedFields.type
-      }).eq('id', id).then(async ({ error }) => {
-        if (!error) await refreshRemoteData();
-        return { success: !error, message: error?.message };
-      });
-    }
-    const updated = deadlines.map(d => d.id === id ? { ...d, ...updatedFields } : d);
-    syncDeadlines(updated);
-    addNotification(`Deadline updated: "${updatedFields.title || id}".`);
-  };
-
-  const deleteDeadline = (id) => {
-    if (isSupabaseConfigured) {
-      return supabase.from('deadlines').delete().eq('id', id).then(async ({ error }) => {
-        if (!error) await refreshRemoteData();
-        return { success: !error, message: error?.message };
-      });
-    }
-    const deadlineToDelete = deadlines.find(d => d.id === id);
-    const updated = deadlines.filter(d => d.id !== id);
-    syncDeadlines(updated);
-    if (deadlineToDelete) {
-      addNotification(`Deadline deleted: "${deadlineToDelete.title}".`);
-    }
-  };
-
-  // Student Deadline Actions
-  const toggleDeadlineCompleted = (deadlineId) => {
-    if (!currentUser || !['student', 'student_head'].includes(currentUser.role)) return;
-
-    if (isSupabaseConfigured) {
-      const completed = currentUser.completedDeadlines || [];
-      const request = completed.includes(deadlineId)
-        ? supabase.from('deadline_completions').delete().eq('student_id', currentUser.id).eq('deadline_id', deadlineId)
-        : supabase.from('deadline_completions').insert({ student_id: currentUser.id, deadline_id: deadlineId });
-      return request.then(async ({ error }) => {
-        if (!error) {
+  const updateUserRole = async (userId, newRole) => {
+    if (useApi) {
+      try {
+        const result = await api.users.updateRole(userId, newRole);
+        if (result.success) {
           await refreshRemoteData();
-          const updatedCompleted = completed.includes(deadlineId)
-            ? completed.filter(id => id !== deadlineId)
-            : [...completed, deadlineId];
-          setCurrentUser({ ...currentUser, completedDeadlines: updatedCompleted });
+          addNotification(`User role updated for ${result.user.name} to ${newRole}.`);
         }
-        return { success: !error, message: error?.message };
-      });
-    }
-    
-    const updatedUsers = users.map(u => {
-      if (u.id === currentUser.id) {
-        const completed = u.completedDeadlines || [];
-        const isAlreadyDone = completed.includes(deadlineId);
-        const updatedCompleted = isAlreadyDone 
-          ? completed.filter(id => id !== deadlineId)
-          : [...completed, deadlineId];
-        
-        const updatedUser = { ...u, completedDeadlines: updatedCompleted };
-        
-        // Sync currentUser state too
-        setCurrentUser(updatedUser);
-        localStorage.setItem(CURRENT_USER_STORAGE_KEY, JSON.stringify(updatedUser));
-        
-        return updatedUser;
+        return result;
+      } catch (error) {
+        return { success: false, message: error.message };
       }
-      return u;
-    });
-
-    syncUsers(updatedUsers);
-  };
-
-  // Events Operations (CRUD)
-  const addEvent = (event) => {
-    if (isSupabaseConfigured) {
-      return supabase.from('events').insert({
-        title: event.title,
-        description: event.description || null,
-        location: event.location,
-        event_date: event.date,
-        event_time: event.time || null,
-        type: event.type,
-        organizer: event.organizer,
-        author_id: currentUser.id
-      }).then(async ({ error }) => {
-        if (!error) await refreshRemoteData();
-        return { success: !error, message: error?.message };
-      });
     }
-    const newEvent = {
-      id: `e_${Date.now()}`,
-      author: currentUser ? currentUser.name : 'Administration',
-      authorRole: currentUser ? currentUser.role : 'admin',
-      ...event
-    };
-    const updated = [newEvent, ...events];
-    syncEvents(updated);
-    addNotification(`New event published by ${newEvent.author}: "${newEvent.title}" scheduled for ${newEvent.date}.`);
-  };
 
-  const updateEvent = (id, updatedFields) => {
-    const updated = events.map(e => e.id === id ? { ...e, ...updatedFields } : e);
-    syncEvents(updated);
-    addNotification(`Event updated: "${updatedFields.title || id}".`);
-  };
-
-  const deleteEvent = (id) => {
-    if (isSupabaseConfigured) {
-      return supabase.from('events').delete().eq('id', id).then(async ({ error }) => {
-        if (!error) await refreshRemoteData();
-        return { success: !error, message: error?.message };
-      });
-    }
-    const eventToDelete = events.find(e => e.id === id);
-    const updated = events.filter(e => e.id !== id);
-    syncEvents(updated);
-    if (eventToDelete) {
-      addNotification(`Event deleted: "${eventToDelete.title}".`);
-    }
-  };
-
-  // Announcements Operations (CRUD)
-  const addAnnouncement = (announcement) => {
-    if (isSupabaseConfigured) {
-      return supabase.from('announcements').insert({
-        title: announcement.title,
-        content: announcement.content,
-        category: announcement.category,
-        is_pinned: announcement.isPinned,
-        author_id: currentUser.id
-      }).then(async ({ error }) => {
-        if (!error) await refreshRemoteData();
-        return { success: !error, message: error?.message };
-      });
-    }
-    const newAnn = {
-      id: `a_${Date.now()}`,
-      author: currentUser ? currentUser.name : 'Administration',
-      authorRole: currentUser ? currentUser.role : 'admin',
-      date: new Date().toISOString().split('T')[0],
-      ...announcement
-    };
-    const updated = [newAnn, ...announcements];
-    syncAnnouncements(updated);
-    addNotification(`New announcement posted by ${newAnn.author}: "${newAnn.title}".`);
-  };
-
-  const updateAnnouncement = (id, updatedFields) => {
-    const updated = announcements.map(a => a.id === id ? { ...a, ...updatedFields } : a);
-    syncAnnouncements(updated);
-    addNotification(`Announcement updated: "${updatedFields.title || id}".`);
-  };
-
-  const deleteAnnouncement = (id) => {
-    if (isSupabaseConfigured) {
-      return supabase.from('announcements').delete().eq('id', id).then(async ({ error }) => {
-        if (!error) await refreshRemoteData();
-        return { success: !error, message: error?.message };
-      });
-    }
-    const annToDelete = announcements.find(a => a.id === id);
-    const updated = announcements.filter(a => a.id !== id);
-    syncAnnouncements(updated);
-    if (annToDelete) {
-      addNotification(`Announcement deleted: "${annToDelete.title}".`);
-    }
-  };
-
-  // User Administration
-  const updateUserRole = (userId, newRole) => {
     const updated = users.map(u => u.id === userId ? { ...u, role: newRole } : u);
     syncUsers(updated);
-    
-    // If updating current logged in user
+
     if (currentUser && currentUser.id === userId) {
       const updatedUser = { ...currentUser, role: newRole };
       setCurrentUser(updatedUser);
@@ -886,29 +878,31 @@ export const DbProvider = ({ children }) => {
     addNotification(`User role updated for user ID: ${userId} to ${newRole}.`);
   };
 
-  const updateUserProfilePic = (userId, newProfilePic) => {
-    if (isSupabaseConfigured) {
-      if (!(newProfilePic instanceof File)) return;
-      const extension = newProfilePic.name.split('.').pop() || 'jpg';
-      const path = `${userId}/${Date.now()}.${extension}`;
-      return supabase.storage.from('profile-pictures').upload(path, newProfilePic, {
-        cacheControl: '3600',
-        upsert: false
-      }).then(async ({ error }) => {
-        if (error) return { success: false, message: error.message };
-        const { data: urlData } = supabase.storage.from('profile-pictures').getPublicUrl(path);
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .update({ profile_picture_url: urlData.publicUrl })
-          .eq('id', userId);
-        if (!profileError) {
-          setCurrentUser({ ...currentUser, profilePic: urlData.publicUrl });
-          await refreshRemoteData();
+  const updateUserProfilePic = async (userId, newProfilePic) => {
+    if (useApi) {
+      try {
+        // For API mode, convert File to data URL if needed
+        let picData = newProfilePic;
+        if (newProfilePic instanceof File) {
+          picData = await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.readAsDataURL(newProfilePic);
+          });
         }
-        return { success: !profileError, message: profileError?.message };
-      });
+
+        const result = await api.users.updateProfilePic(userId, picData);
+        if (result.success) {
+          setCurrentUser(prev => prev && prev.id === userId ? { ...prev, profilePic: picData } : prev);
+          addNotification('Profile picture updated successfully.');
+        }
+        return result;
+      } catch (error) {
+        return { success: false, message: error.message };
+      }
     }
 
+    // localStorage fallback
     const updatedUsers = users.map(u => u.id === userId ? { ...u, profilePic: newProfilePic } : u);
     syncUsers(updatedUsers);
 
@@ -917,8 +911,10 @@ export const DbProvider = ({ children }) => {
       setCurrentUser(updatedUser);
       localStorage.setItem(CURRENT_USER_STORAGE_KEY, JSON.stringify(updatedUser));
     }
-    addNotification(`Profile picture updated successfully.`);
+    addNotification('Profile picture updated successfully.');
   };
+
+  // ─── Context Value ────────────────────────────────────────────────────
 
   return (
     <DbContext.Provider value={{

@@ -1,0 +1,27 @@
+{
+  "name": "ttu-dashboard-server",
+  "version": "1.0.0",
+  "description": "Node.js + Express + Prisma backend for TTU Digital Dashboard",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "node --watch src/index.js",
+    "start": "node src/index.js",
+    "seed": "node src/seed.js",
+    "prisma:generate": "npx prisma generate",
+    "prisma:push": "npx prisma db push",
+    "prisma:studio": "npx prisma studio"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.9.0",
+    "bcryptjs": "^3.0.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.5.0",
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^2.0.1"
+  },
+  "devDependencies": {
+    "prisma": "^6.9.0"
+  }
+}

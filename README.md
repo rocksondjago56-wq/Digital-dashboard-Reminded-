@@ -8,7 +8,10 @@ This project is being prepared to use Supabase for authentication, database stor
 2. Run [`supabase/schema.sql`](supabase/schema.sql) in the Supabase SQL Editor.
 3. Copy `.env.example` to `.env.local` and add the Project URL and publishable key from Supabase's **Connect** dialog.
 4. In Supabase Authentication settings, set the production site URL and allowed redirect URLs, then keep email confirmation enabled.
-5. Run `supabase/migrations/002_lecturer_requests.sql` after the main schema. Public users may request a lecturer account, but the department must approve it by changing the profile role in Supabase. Administrator accounts are issued only by the department.
+5. Run `supabase/migrations/002_lecturer_requests.sql` after the main schema.
+6. For an existing Supabase project, also run `supabase/migrations/003_profile_signup_details.sql` so new portal accounts appear with their role request, year, index number, staff ID, and course details.
+
+Public users may request a lecturer or administrator account, but the department should approve elevated access by changing the profile role in Supabase.
 
 Never expose a Supabase `service_role` key in this Vite application or commit `.env.local`.
 

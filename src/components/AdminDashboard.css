@@ -355,6 +355,49 @@
 }
 
 @media (max-width: 768px) {
+  .metrics-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .metric-card {
+    gap: 12px;
+    padding: 14px;
+  }
+
+  .metric-icon {
+    width: 44px;
+    height: 44px;
+    font-size: 1.35rem;
+    flex-shrink: 0;
+  }
+
+  .metric-number {
+    font-size: 1.45rem;
+  }
+
+  .metric-label {
+    font-size: 0.68rem;
+  }
+
+  .admin-tab-nav {
+    gap: 8px;
+    padding-bottom: 8px;
+  }
+
+  .admin-nav-btn {
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: var(--radius-sm);
+    padding: 9px 12px;
+    font-size: 0.8rem;
+  }
+
+  .admin-nav-btn.active {
+    background: #eff6ff;
+    border-color: #004085;
+  }
+
   .admin-working-card {
     padding: 16px;
   }
@@ -369,6 +412,18 @@
     align-items: flex-start;
     flex-direction: column;
     gap: 12px;
+  }
+
+  .admin-row-actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .admin-row-actions .btn,
+  .admin-row-actions .btn-icon-danger,
+  .admin-data-row .btn-icon-danger {
+    flex: 1;
+    width: 100%;
   }
 
   .admin-data-row .btn-icon-danger {
@@ -396,5 +451,11 @@
 
   .admin-nav-btn {
     padding: 10px 14px;
+    flex: 0 0 auto;
+  }
+
+  .admin-generated-title,
+  .admin-action-form {
+    border-radius: var(--radius-sm);
   }
 }

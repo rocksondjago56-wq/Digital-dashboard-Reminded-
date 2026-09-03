@@ -276,24 +276,36 @@
 }
 
 @media (max-width: 768px) {
+  .form-card {
+    padding: 18px;
+  }
+
   .lecturer-item-card {
     flex-direction: column;
     align-items: flex-start;
     gap: 16px;
   }
-  
+
   .item-card-actions {
     width: 100%;
     display: flex;
-    justify-content: flex-end;
+    justify-content: stretch;
   }
 
   .hero-actions {
     width: 100%;
   }
 
-  .hero-actions .btn {
+  .hero-actions .btn,
+  .item-card-actions .btn,
+  .item-card-actions .btn-icon-danger {
     flex: 1;
+  }
+
+  .section-header-simple {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
   }
 }
 
@@ -323,9 +335,17 @@
     padding: 16px;
   }
 
+  .lecturer-item-card h3 {
+    font-size: 1rem;
+  }
+
   .item-meta,
   .ann-card-header {
     flex-wrap: wrap;
     gap: 6px;
+  }
+
+  .checkbox-form-group {
+    align-items: flex-start;
   }
 }

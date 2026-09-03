@@ -1,5 +1,7 @@
--- Run this after schema.sql. It records a lecturer request without granting
--- lecturer permissions until a department administrator approves the profile.
+-- Run this once on an existing Supabase project after schema.sql and 002.
+-- It lets portal signups appear with their full profile details.
+
+alter type public.user_role add value if not exists 'student_head';
 
 alter table public.profiles
   add column if not exists requested_role text,
@@ -39,10 +41,7 @@ begin
     new.id,
     coalesce(nullif(new.raw_user_meta_data ->> 'name', ''), split_part(new.email, '@', 1)),
     new.email,
-    case
-      when requested = 'student_head' then 'student_head'::public.user_role
-      else 'student'::public.user_role
-    end,
+    'student'::public.user_role,
     nullif(new.raw_user_meta_data ->> 'year', ''),
     nullif(new.raw_user_meta_data ->> 'student_id', ''),
     nullif(new.raw_user_meta_data ->> 'staff_id', ''),
