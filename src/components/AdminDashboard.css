@@ -154,6 +154,7 @@
 .admin-generated-title strong {
   color: #0f172a;
   font-size: 1rem;
+  overflow-wrap: anywhere;
 }
 
 .admin-whatsapp-actions {
@@ -219,6 +220,7 @@
   justify-content: space-between;
   align-items: center;
   gap: 20px;
+  min-width: 0;
   padding: 16px;
   background: #ffffff;
   border: 1px solid var(--border-light);
@@ -235,6 +237,10 @@
   font-size: 1.05rem;
   margin-bottom: 4px;
   color: #0f172a;
+}
+
+.admin-row-info {
+  min-width: 0;
 }
 
 .admin-row-info p {
@@ -408,6 +414,10 @@
     gap: 12px;
   }
 
+  .tab-actions-row .btn {
+    width: 100%;
+  }
+
   .admin-data-row {
     align-items: flex-start;
     flex-direction: column;
@@ -457,5 +467,10 @@
   .admin-generated-title,
   .admin-action-form {
     border-radius: var(--radius-sm);
+  }
+
+  .admin-whatsapp-actions,
+  .admin-whatsapp-actions .btn {
+    width: 100%;
   }
 }

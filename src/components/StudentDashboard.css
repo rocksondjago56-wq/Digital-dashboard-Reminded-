@@ -195,6 +195,7 @@
 /* Deadline card internals */
 .deadline-body {
   flex: 1;
+  min-width: 0;
 }
 
 .deadline-meta-row {
@@ -223,6 +224,19 @@
   font-size: 0.9rem;
   color: var(--text-secondary);
   line-height: 1.4;
+}
+
+.deadline-attachment-container {
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.deadline-attachment-container > div {
+  min-width: 0;
+}
+
+.deadline-attachment-container strong {
+  overflow-wrap: anywhere;
 }
 
 .deadline-attachment-link {
@@ -505,6 +519,7 @@
 
 .slot-details {
   flex: 1;
+  min-width: 0;
 }
 
 .slot-details h4 {
@@ -689,6 +704,10 @@
     gap: 12px;
   }
 
+  .deadline-check {
+    padding-top: 0;
+  }
+
   .deadline-timing {
     flex-direction: row;
     align-items: center;
@@ -722,6 +741,15 @@
     align-items: flex-start;
   }
 
+  .student-timetable-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .student-timetable-header .btn {
+    width: 100%;
+  }
+
   .source-filter-bar {
     padding: 16px;
     align-items: flex-start;
@@ -748,6 +776,7 @@
   }
 
   .hero-stats {
+    flex-direction: column;
     gap: 8px;
   }
 
@@ -773,6 +802,27 @@
 
   .deadline-card {
     padding: 16px;
+  }
+
+  .deadline-timing {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .deadline-attachment-container {
+    align-items: stretch !important;
+    flex-direction: column;
+  }
+
+  .deadline-attachment-container > div:last-child {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .deadline-attachment-container a {
+    justify-content: center;
+    text-align: center;
+    width: 100%;
   }
 
   .deadline-meta-row,

@@ -61,6 +61,7 @@ body {
   background-color: var(--bg-dark);
   color: var(--text-primary);
   min-height: 100vh;
+  width: 100%;
   overflow-x: hidden;
   line-height: 1.6;
   background-image:
@@ -78,6 +79,7 @@ img, video, canvas, svg {
 
 #root {
   min-height: 100vh;
+  min-width: 0;
   display: flex;
   flex-direction: column;
 }
@@ -167,6 +169,7 @@ label {
   align-items: center;
   justify-content: center;
   gap: 8px;
+  max-width: 100%;
   padding: 12px 24px;
   font-family: var(--font-heading);
   font-size: 0.95rem;
@@ -354,6 +357,9 @@ label {
   .btn {
     min-height: 44px;
     padding: 10px 16px;
+  }
+
+  .btn.w-full {
     width: 100%;
   }
 
