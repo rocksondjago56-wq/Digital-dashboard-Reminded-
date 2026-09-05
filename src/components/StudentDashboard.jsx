@@ -54,6 +54,10 @@ export default function StudentDashboard() {
     slot.year === 'All Years' ||
     slot.year === currentUser.year
   ));
+  const profilePhotoSrc = typeof currentUser?.profilePic === 'string' && currentUser.profilePic.trim()
+    ? currentUser.profilePic
+    : '';
+  const profileInitial = currentUser?.name?.charAt(0)?.toUpperCase() || 'S';
 
   useEffect(() => {
     if (canManageClassGroup && currentUser?.year) {
@@ -222,9 +226,18 @@ export default function StudentDashboard() {
     <div className="dashboard-content container animate-fade-in">
       {/* Welcome Banner */}
       <header className="dashboard-hero glass-panel">
-        <div className="hero-text">
-          <h1>{currentUser?.name || 'Student Dashboard'}</h1>
-          <p>Signed in as <strong>{currentUser.name}</strong> ({currentUser.year || 'Year 1'} Graphic Design). Track your assignments, download course notes, and check submission deadlines.</p>
+        <div className="hero-student-profile">
+          <div className="student-avatar-wrapper" title="Profile picture">
+            {profilePhotoSrc ? (
+              <img src={profilePhotoSrc} alt={currentUser.name} className="student-profile-photo" />
+            ) : (
+              <div className="student-profile-initial">{profileInitial}</div>
+            )}
+          </div>
+          <div className="hero-text">
+            <h1>{currentUser?.name || 'Student Dashboard'}</h1>
+            <p>Signed in as <strong>{currentUser.name}</strong> ({currentUser.year || 'Year 1'} Graphic Design). Track your assignments, download course notes, and check submission deadlines.</p>
+          </div>
         </div>
         <div className="hero-stats">
           <div className="hero-stat-card">
