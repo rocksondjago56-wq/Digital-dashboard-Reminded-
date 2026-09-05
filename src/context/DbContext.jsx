@@ -161,6 +161,78 @@ const sortTimetable = (items) => [...items].sort((a, b) => {
   return a.time.localeCompare(b.time);
 });
 
+const sanitizeProfilePic = (profilePic) => (
+  typeof profilePic === 'string' && profilePic.trim() ? profilePic : ''
+);
+
+const normalizeUserProfilePic = (user) => (
+  user ? { ...user, profilePic: sanitizeProfilePic(user.profilePic) } : user
+);
+
+const fileToDataUrl = (file) => new Promise((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onerror = () => reject(new Error('Could not read the selected image.'));
+  reader.onload = () => {
+    if (typeof reader.result === 'string') {
+      resolve(reader.result);
+    } else {
+      reject(new Error('Could not prepare the selected image.'));
+    }
+  };
+  reader.readAsDataURL(file);
+});
+
+const resizeImageToAvatarDataUrl = (file) => new Promise((resolve, reject) => {
+  if (typeof Image === 'undefined' || typeof document === 'undefined' || typeof URL === 'undefined') {
+    fileToDataUrl(file).then(resolve, reject);
+    return;
+  }
+
+  const objectUrl = URL.createObjectURL(file);
+  const image = new Image();
+
+  image.onload = () => {
+    const canvas = document.createElement('canvas');
+    const targetSize = 512;
+    const sourceSize = Math.min(image.naturalWidth, image.naturalHeight);
+    const sourceX = Math.max(0, (image.naturalWidth - sourceSize) / 2);
+    const sourceY = Math.max(0, (image.naturalHeight - sourceSize) / 2);
+
+    canvas.width = targetSize;
+    canvas.height = targetSize;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      URL.revokeObjectURL(objectUrl);
+      fileToDataUrl(file).then(resolve, reject);
+      return;
+    }
+
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, targetSize, targetSize);
+    ctx.drawImage(image, sourceX, sourceY, sourceSize, sourceSize, 0, 0, targetSize, targetSize);
+    URL.revokeObjectURL(objectUrl);
+    resolve(canvas.toDataURL('image/jpeg', 0.84));
+  };
+
+  image.onerror = () => {
+    URL.revokeObjectURL(objectUrl);
+    fileToDataUrl(file).then(resolve, reject);
+  };
+
+  image.src = objectUrl;
+});
+
+const prepareProfilePic = async (profilePic) => {
+  if (typeof File !== 'undefined' && profilePic instanceof File) {
+    if (!profilePic.type.startsWith('image/')) {
+      throw new Error('Please choose an image file.');
+    }
+    return resizeImageToAvatarDataUrl(profilePic);
+  }
+
+  return sanitizeProfilePic(profilePic);
+};
+
 // ─── localStorage Helpers ───────────────────────────────────────────────────
 
 const mergeSeedUsers = (savedUsers) => {
@@ -172,7 +244,7 @@ const mergeSeedUsers = (savedUsers) => {
 const getSavedUsers = () => {
   try {
     const savedUsers = localStorage.getItem(USERS_STORAGE_KEY);
-    return savedUsers ? JSON.parse(savedUsers) : null;
+    return savedUsers ? JSON.parse(savedUsers).map(normalizeUserProfilePic) : null;
   } catch {
     localStorage.removeItem(USERS_STORAGE_KEY);
     return null;
@@ -182,7 +254,7 @@ const getSavedUsers = () => {
 const getSavedCurrentUser = () => {
   try {
     const savedUser = localStorage.getItem(CURRENT_USER_STORAGE_KEY);
-    return savedUser ? JSON.parse(savedUser) : null;
+    return savedUser ? normalizeUserProfilePic(JSON.parse(savedUser)) : null;
   } catch {
     localStorage.removeItem(CURRENT_USER_STORAGE_KEY);
     return null;
@@ -879,18 +951,19 @@ export const DbProvider = ({ children }) => {
   };
 
   const updateUserProfilePic = async (userId, newProfilePic) => {
+    let picData = '';
+    try {
+      picData = await prepareProfilePic(newProfilePic);
+    } catch (error) {
+      return { success: false, message: error.message };
+    }
+
+    if (!picData) {
+      return { success: false, message: 'Please choose a valid image file.' };
+    }
+
     if (useApi) {
       try {
-        // For API mode, convert File to data URL if needed
-        let picData = newProfilePic;
-        if (newProfilePic instanceof File) {
-          picData = await new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result);
-            reader.readAsDataURL(newProfilePic);
-          });
-        }
-
         const result = await api.users.updateProfilePic(userId, picData);
         if (result.success) {
           setCurrentUser(prev => prev && prev.id === userId ? { ...prev, profilePic: picData } : prev);
@@ -903,15 +976,16 @@ export const DbProvider = ({ children }) => {
     }
 
     // localStorage fallback
-    const updatedUsers = users.map(u => u.id === userId ? { ...u, profilePic: newProfilePic } : u);
+    const updatedUsers = users.map(u => u.id === userId ? { ...u, profilePic: picData } : u);
     syncUsers(updatedUsers);
 
     if (currentUser && currentUser.id === userId) {
-      const updatedUser = { ...currentUser, profilePic: newProfilePic };
+      const updatedUser = { ...currentUser, profilePic: picData };
       setCurrentUser(updatedUser);
       localStorage.setItem(CURRENT_USER_STORAGE_KEY, JSON.stringify(updatedUser));
     }
     addNotification('Profile picture updated successfully.');
+    return { success: true };
   };
 
   // ─── Context Value ────────────────────────────────────────────────────

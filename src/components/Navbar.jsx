@@ -7,6 +7,8 @@ import { openWhatsApp, getWhatsAppConfig } from '../utils/whatsapp';
 export default function Navbar() {
   const { currentUser, logout, notifications, markAllNotificationsAsRead, updateUserProfilePic } = useContext(DbContext);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [avatarError, setAvatarError] = useState('');
+  const [isUpdatingAvatar, setIsUpdatingAvatar] = useState(false);
   const dropdownRef = useRef(null);
   const fileInputRef = useRef(null);
 
@@ -29,11 +31,32 @@ export default function Navbar() {
     }
   };
 
-  const handleFileChange = (e) => {
+  const avatarSrc = typeof currentUser.profilePic === 'string' && currentUser.profilePic.trim()
+    ? currentUser.profilePic
+    : '';
+  const avatarInitial = currentUser.name?.charAt(0)?.toUpperCase() || 'U';
+
+  const handleFileChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    updateUserProfilePic(currentUser.id, file);
-    e.target.value = '';
+
+    if (!file.type.startsWith('image/')) {
+      setAvatarError('Please choose an image file.');
+      e.target.value = '';
+      return;
+    }
+
+    setAvatarError('');
+    setIsUpdatingAvatar(true);
+    try {
+      const result = await updateUserProfilePic(currentUser.id, file);
+      if (result?.success === false) {
+        setAvatarError(result.message || 'Could not save photo.');
+      }
+    } finally {
+      setIsUpdatingAvatar(false);
+      e.target.value = '';
+    }
   };
 
   const unreadCount = notifications.filter(n => !n.isRead).length;
@@ -100,11 +123,13 @@ export default function Navbar() {
           onChange={handleFileChange} 
         />
         <div className="user-profile-widget" onClick={handleAvatarClick} title="Click to change profile picture">
-          <div className="user-avatar clickable-avatar">
-            {currentUser.profilePic ? (
-              <img src={currentUser.profilePic} alt={currentUser.name} className="user-avatar-img" />
+          <div className={`user-avatar clickable-avatar ${isUpdatingAvatar ? 'is-uploading' : ''}`}>
+            {isUpdatingAvatar ? (
+              <span className="avatar-uploading">...</span>
+            ) : avatarSrc ? (
+              <img src={avatarSrc} alt={currentUser.name} className="user-avatar-img" />
             ) : (
-              currentUser.name.charAt(0)
+              avatarInitial
             )}
             <span className="avatar-camera-badge">📷</span>
           </div>
@@ -114,6 +139,7 @@ export default function Navbar() {
               {getRoleLabel(currentUser.role)}
             </span>
           </div>
+          {avatarError && <span className="avatar-error-message">{avatarError}</span>}
         </div>
 
         {/* WhatsApp Desk Button */}
