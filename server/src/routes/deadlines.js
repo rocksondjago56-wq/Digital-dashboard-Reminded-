@@ -18,6 +18,7 @@ router.get('/', authenticate, async (req, res) => {
 
     const formatted = deadlines.map(d => ({
       id: d.id,
+      authorId: d.authorId,
       title: d.title,
       description: d.description,
       course: d.course,
@@ -70,6 +71,7 @@ router.post('/', authenticate, requireStaff(), async (req, res) => {
       success: true,
       deadline: {
         id: deadline.id,
+        authorId: deadline.authorId,
         title: deadline.title,
         description: deadline.description,
         course: deadline.course,
@@ -126,6 +128,7 @@ router.put('/:id', authenticate, async (req, res) => {
       success: true,
       deadline: {
         id: updated.id,
+        authorId: updated.authorId,
         title: updated.title,
         description: updated.description,
         course: updated.course,

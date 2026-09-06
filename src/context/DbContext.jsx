@@ -618,6 +618,7 @@ export const DbProvider = ({ children }) => {
 
     const newDeadline = {
       id: `d_${Date.now()}`,
+      authorId: currentUser?.id || '',
       author: currentUser ? currentUser.name : 'Administration',
       authorRole: currentUser ? currentUser.role : 'admin',
       ...deadline,
@@ -774,6 +775,7 @@ export const DbProvider = ({ children }) => {
 
     const newAnn = {
       id: `a_${Date.now()}`,
+      authorId: currentUser?.id || '',
       author: currentUser ? currentUser.name : 'Administration',
       authorRole: currentUser ? currentUser.role : 'admin',
       date: new Date().toISOString().split('T')[0],

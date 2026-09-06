@@ -18,6 +18,7 @@ router.get('/', authenticate, async (req, res) => {
 
     const formatted = announcements.map(a => ({
       id: a.id,
+      authorId: a.authorId,
       title: a.title,
       content: a.content,
       category: a.category,
@@ -65,6 +66,7 @@ router.post('/', authenticate, requireStaff(), async (req, res) => {
       success: true,
       announcement: {
         id: announcement.id,
+        authorId: announcement.authorId,
         title: announcement.title,
         content: announcement.content,
         category: announcement.category,
@@ -117,6 +119,7 @@ router.put('/:id', authenticate, async (req, res) => {
       success: true,
       announcement: {
         id: updated.id,
+        authorId: updated.authorId,
         title: updated.title,
         content: updated.content,
         category: updated.category,

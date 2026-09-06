@@ -241,7 +241,7 @@ export default function Login() {
               {/* STUDENT ROLE FIELDS */}
               {regRole === 'student' && (
                 <>
-                  <div className="form-row-2">
+                  <div className="student-signup-row">
                     <div className="form-group">
                       <label htmlFor="regYear">Academic Year</label>
                       <select

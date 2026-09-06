@@ -73,6 +73,26 @@
   margin-bottom: 20px;
 }
 
+.student-signup-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.student-signup-row .form-group {
+  min-width: 0;
+}
+
+.student-signup-row label {
+  display: block;
+  min-height: 20px;
+}
+
+.student-signup-row select {
+  width: 100%;
+}
+
 .w-full {
   width: 100%;
 }
@@ -142,6 +162,15 @@
 
   .login-form .form-group {
     margin-bottom: 14px;
+  }
+
+  .student-signup-row {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .student-signup-row label {
+    min-height: 0;
   }
 
   .login-header {

@@ -44,6 +44,8 @@ export default function LecturerDashboard() {
   const [dlType, setDlType] = useState('assignment');
   const [dlAttachment, setDlAttachment] = useState(null);
   const [attachmentError, setAttachmentError] = useState('');
+  const [publishStatus, setPublishStatus] = useState('');
+  const [publishError, setPublishError] = useState('');
 
   // Announcement Fields
   const [annTitle, setAnnTitle] = useState('');
@@ -53,11 +55,14 @@ export default function LecturerDashboard() {
   const [annCertificate, setAnnCertificate] = useState('All Certificates');
   const [annYear, setAnnYear] = useState('All Years');
 
-  const handleCreateDeadline = (e) => {
+  const handleCreateDeadline = async (e) => {
     e.preventDefault();
     if (!dlTitle || !dlDesc || !dlDate) return;
 
-    addDeadline({
+    setPublishStatus('');
+    setPublishError('');
+
+    const result = await addDeadline({
       title: dlTitle,
       description: dlDesc,
       course: dlCourse,
@@ -70,6 +75,11 @@ export default function LecturerDashboard() {
       authorRole: 'lecturer'
     });
 
+    if (result?.success === false) {
+      setPublishError(result.message || 'Your deadline could not be published.');
+      return;
+    }
+
     // Reset Form
     setDlTitle('');
     setDlDesc('');
@@ -78,6 +88,7 @@ export default function LecturerDashboard() {
     setDlYear('Year 1');
     setDlAttachment(null);
     setAttachmentError('');
+    setPublishStatus('Deadline published. It is now listed below for the selected class.');
     setShowDeadlineForm(false);
   };
 
@@ -109,11 +120,14 @@ export default function LecturerDashboard() {
     reader.readAsDataURL(file);
   };
 
-  const handleCreateAnnouncement = (e) => {
+  const handleCreateAnnouncement = async (e) => {
     e.preventDefault();
     if (!annTitle || !annContent) return;
 
-    addAnnouncement({
+    setPublishStatus('');
+    setPublishError('');
+
+    const result = await addAnnouncement({
       title: annTitle,
       content: annContent,
       author: currentUser.name,
@@ -124,20 +138,28 @@ export default function LecturerDashboard() {
       year: annYear
     });
 
+    if (result?.success === false) {
+      setPublishError(result.message || 'Your announcement could not be published.');
+      return;
+    }
+
     // Reset Form
     setAnnTitle('');
     setAnnContent('');
     setAnnPinned(false);
     setAnnCertificate('All Certificates');
     setAnnYear('All Years');
+    setPublishStatus('Announcement published. It is now listed in Your Posted Bulletins.');
     setShowAnnounceForm(false);
   };
 
   // Include posts authored by this lecturer even if their course list later changes.
-  const filteredDeadlines = deadlines.filter(d => d.author === currentUser.name || lecturerCourses.includes(d.course));
+  const filteredDeadlines = deadlines.filter(d => (
+    d.authorId === currentUser.id || d.author === currentUser.name || lecturerCourses.includes(d.course)
+  ));
 
   // Filter announcements posted by this lecturer
-  const filteredAnnouncements = announcements.filter(a => a.author === currentUser.name);
+  const filteredAnnouncements = announcements.filter(a => a.authorId === currentUser.id || a.author === currentUser.name);
 
   return (
     <div className="dashboard-content container animate-fade-in">
@@ -161,6 +183,9 @@ export default function LecturerDashboard() {
           </button>
         </div>
       </header>
+
+      {publishStatus && <p className="publish-feedback publish-success" role="status">{publishStatus}</p>}
+      {publishError && <p className="publish-feedback publish-error" role="alert">{publishError}</p>}
 
       {/* Forms Drawer */}
       <div className="lecturer-forms-row mt-2">
