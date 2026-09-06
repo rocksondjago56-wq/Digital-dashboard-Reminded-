@@ -36,6 +36,7 @@ model User {
   role              UserRole  @default(student)
   department        String    @default("Graphic Design")
   year              String?
+  certificate       String?
   studentId         String?   @unique @map("student_id")
   staffId           String?   @unique @map("staff_id")
   designation       String?
@@ -58,6 +59,8 @@ model Deadline {
   title          String
   description    String
   course         String
+  certificate   String       @default("All Certificates")
+  year          String       @default("All Years")
   dueDate        DateTime     @map("due_date") @db.Date
   type           DeadlineType
   authorId       String       @map("author_id")
@@ -77,6 +80,8 @@ model Announcement {
   title     String
   content   String
   category  AnnouncementCategory
+  certificate String          @default("All Certificates")
+  year        String          @default("All Years")
   isPinned  Boolean              @default(false) @map("is_pinned")
   authorId  String               @map("author_id")
   createdAt DateTime             @default(now()) @map("created_at")

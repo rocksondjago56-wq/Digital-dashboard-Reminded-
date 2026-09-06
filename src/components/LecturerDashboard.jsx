@@ -7,6 +7,15 @@ import {
   formatDeadlineForWhatsApp
 } from '../utils/whatsapp';
 
+const CERTIFICATE_OPTIONS = ['BTech', 'HND', 'Diploma'];
+const YEAR_OPTIONS = ['Year 1', 'Year 2', 'Year 3', 'Year 4'];
+
+const asCourseList = (courses) => {
+  if (Array.isArray(courses)) return courses.filter(Boolean);
+  if (typeof courses === 'string') return courses.split(',').map(course => course.trim()).filter(Boolean);
+  return [];
+};
+
 export default function LecturerDashboard() {
   const { 
     currentUser, 
@@ -24,9 +33,13 @@ export default function LecturerDashboard() {
   const [showAnnounceForm, setShowAnnounceForm] = useState(false);
 
   // Deadline Fields
+  const lecturerCourses = asCourseList(currentUser?.courses);
+  const availableCourses = lecturerCourses.length ? lecturerCourses : ['General Graphic Design'];
   const [dlTitle, setDlTitle] = useState('');
   const [dlDesc, setDlDesc] = useState('');
-  const [dlCourse, setDlCourse] = useState(currentUser.courses?.[0] || 'General Graphic Design');
+  const [dlCourse, setDlCourse] = useState(availableCourses[0]);
+  const [dlCertificate, setDlCertificate] = useState('BTech');
+  const [dlYear, setDlYear] = useState('Year 1');
   const [dlDate, setDlDate] = useState('');
   const [dlType, setDlType] = useState('assignment');
   const [dlAttachment, setDlAttachment] = useState(null);
@@ -37,6 +50,8 @@ export default function LecturerDashboard() {
   const [annContent, setAnnContent] = useState('');
   const [annCategory, setAnnCategory] = useState('notice');
   const [annPinned, setAnnPinned] = useState(false);
+  const [annCertificate, setAnnCertificate] = useState('All Certificates');
+  const [annYear, setAnnYear] = useState('All Years');
 
   const handleCreateDeadline = (e) => {
     e.preventDefault();
@@ -46,6 +61,8 @@ export default function LecturerDashboard() {
       title: dlTitle,
       description: dlDesc,
       course: dlCourse,
+      certificate: dlCertificate,
+      year: dlYear,
       dueDate: dlDate,
       type: dlType,
       attachment: dlAttachment,
@@ -57,6 +74,8 @@ export default function LecturerDashboard() {
     setDlTitle('');
     setDlDesc('');
     setDlDate('');
+    setDlCertificate('BTech');
+    setDlYear('Year 1');
     setDlAttachment(null);
     setAttachmentError('');
     setShowDeadlineForm(false);
@@ -100,19 +119,22 @@ export default function LecturerDashboard() {
       author: currentUser.name,
       authorRole: 'lecturer',
       category: annCategory,
-      isPinned: annPinned
+      isPinned: annPinned,
+      certificate: annCertificate,
+      year: annYear
     });
 
     // Reset Form
     setAnnTitle('');
     setAnnContent('');
     setAnnPinned(false);
+    setAnnCertificate('All Certificates');
+    setAnnYear('All Years');
     setShowAnnounceForm(false);
   };
 
-  // Filter deadlines belonging to the lecturer's courses
-  const lecturerCourses = currentUser.courses || [];
-  const filteredDeadlines = deadlines.filter(d => lecturerCourses.includes(d.course));
+  // Include posts authored by this lecturer even if their course list later changes.
+  const filteredDeadlines = deadlines.filter(d => d.author === currentUser.name || lecturerCourses.includes(d.course));
 
   // Filter announcements posted by this lecturer
   const filteredAnnouncements = announcements.filter(a => a.author === currentUser.name);
@@ -125,7 +147,7 @@ export default function LecturerDashboard() {
           <h1>{currentUser?.name || 'Lecturer Dashboard'}</h1>
           <p>Signed in as <strong>{currentUser.name}</strong>. Manage course deadlines, upload assignment briefs, and publish notices for your students.</p>
           <div className="lecturer-courses-pills mt-2">
-            {lecturerCourses.map((c, i) => (
+            {availableCourses.map((c, i) => (
               <span key={i} className="course-pill">📘 {c}</span>
             ))}
           </div>
@@ -160,9 +182,25 @@ export default function LecturerDashboard() {
                 <div className="form-group">
                   <label>Course Subject</label>
                   <select value={dlCourse} onChange={(e) => setDlCourse(e.target.value)}>
-                    {lecturerCourses.map((c, i) => (
+                    {availableCourses.map((c, i) => (
                       <option key={i} value={c}>{c}</option>
                     ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Certificate Programme</label>
+                  <select value={dlCertificate} onChange={(e) => setDlCertificate(e.target.value)}>
+                    {CERTIFICATE_OPTIONS.map(certificate => (
+                      <option key={certificate} value={certificate}>{certificate}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="form-row-2">
+                <div className="form-group">
+                  <label>Class / Year Group</label>
+                  <select value={dlYear} onChange={(e) => setDlYear(e.target.value)}>
+                    {YEAR_OPTIONS.map(year => <option key={year} value={year}>{year}</option>)}
                   </select>
                 </div>
                 <div className="form-group">
@@ -252,6 +290,22 @@ export default function LecturerDashboard() {
                   <label htmlFor="pin-ann" className="inline-label">📌 Pin Notice to Top</label>
                 </div>
               </div>
+              <div className="form-row-2">
+                <div className="form-group">
+                  <label>Certificate Programme</label>
+                  <select value={annCertificate} onChange={(e) => setAnnCertificate(e.target.value)}>
+                    <option value="All Certificates">All Certificates</option>
+                    {CERTIFICATE_OPTIONS.map(certificate => <option key={certificate} value={certificate}>{certificate}</option>)}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Class / Year Group</label>
+                  <select value={annYear} onChange={(e) => setAnnYear(e.target.value)}>
+                    <option value="All Years">All Years</option>
+                    {YEAR_OPTIONS.map(year => <option key={year} value={year}>{year}</option>)}
+                  </select>
+                </div>
+              </div>
               <div className="form-group">
                 <label>Notice Content</label>
                 <textarea 
@@ -300,6 +354,8 @@ export default function LecturerDashboard() {
                         }`}>
                           {d.type}
                         </span>
+                        <span className="target-pill">{d.certificate || 'All Certificates'}</span>
+                        <span className="target-pill">{d.year || 'All Years'}</span>
                       </div>
                       <h3>{d.title}</h3>
                       <p>{d.description}</p>
@@ -400,6 +456,7 @@ export default function LecturerDashboard() {
                       </div>
                     </div>
                     <h3>{a.title} {a.isPinned && '📌'}</h3>
+                    <div className="announcement-target">{a.certificate || 'All Certificates'} - {a.year || 'All Years'}</div>
                     <p>{a.content}</p>
                   </div>
                 ))

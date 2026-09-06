@@ -21,6 +21,8 @@ router.get('/', authenticate, async (req, res) => {
       title: a.title,
       content: a.content,
       category: a.category,
+      certificate: a.certificate,
+      year: a.year,
       isPinned: a.isPinned,
       date: a.createdAt.toISOString().split('T')[0],
       author: a.author?.name || 'Department',
@@ -40,7 +42,7 @@ router.get('/', authenticate, async (req, res) => {
  */
 router.post('/', authenticate, requireStaff(), async (req, res) => {
   try {
-    const { title, content, category, isPinned } = req.body;
+    const { title, content, category, isPinned, certificate, year } = req.body;
 
     if (!title || !content || !category) {
       return res.status(400).json({ error: 'Title, content, and category are required.' });
@@ -51,6 +53,8 @@ router.post('/', authenticate, requireStaff(), async (req, res) => {
         title,
         content,
         category,
+        certificate: certificate || 'All Certificates',
+        year: year || 'All Years',
         isPinned: isPinned || false,
         authorId: req.user.id
       },
@@ -64,6 +68,8 @@ router.post('/', authenticate, requireStaff(), async (req, res) => {
         title: announcement.title,
         content: announcement.content,
         category: announcement.category,
+        certificate: announcement.certificate,
+        year: announcement.year,
         isPinned: announcement.isPinned,
         date: announcement.createdAt.toISOString().split('T')[0],
         author: announcement.author?.name || 'Department',
@@ -93,13 +99,15 @@ router.put('/:id', authenticate, async (req, res) => {
       return res.status(403).json({ error: 'Only the author or an admin can update this announcement.' });
     }
 
-    const { title, content, category, isPinned } = req.body;
+    const { title, content, category, isPinned, certificate, year } = req.body;
     const updated = await prisma.announcement.update({
       where: { id },
       data: {
         ...(title !== undefined && { title }),
         ...(content !== undefined && { content }),
         ...(category !== undefined && { category }),
+        ...(certificate !== undefined && { certificate }),
+        ...(year !== undefined && { year }),
         ...(isPinned !== undefined && { isPinned })
       },
       include: { author: { select: { name: true, role: true } } }
@@ -112,6 +120,8 @@ router.put('/:id', authenticate, async (req, res) => {
         title: updated.title,
         content: updated.content,
         category: updated.category,
+        certificate: updated.certificate,
+        year: updated.year,
         isPinned: updated.isPinned,
         date: updated.createdAt.toISOString().split('T')[0],
         author: updated.author?.name || 'Department',

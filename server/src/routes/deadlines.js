@@ -21,6 +21,8 @@ router.get('/', authenticate, async (req, res) => {
       title: d.title,
       description: d.description,
       course: d.course,
+      certificate: d.certificate,
+      year: d.year,
       dueDate: d.dueDate.toISOString().split('T')[0],
       type: d.type,
       status: 'pending',
@@ -42,7 +44,7 @@ router.get('/', authenticate, async (req, res) => {
  */
 router.post('/', authenticate, requireStaff(), async (req, res) => {
   try {
-    const { title, description, course, dueDate, type, attachment } = req.body;
+    const { title, description, course, certificate, year, dueDate, type, attachment } = req.body;
 
     if (!title || !description || !course || !dueDate || !type) {
       return res.status(400).json({ error: 'Title, description, course, dueDate, and type are required.' });
@@ -53,6 +55,8 @@ router.post('/', authenticate, requireStaff(), async (req, res) => {
         title,
         description,
         course,
+        certificate: certificate || 'All Certificates',
+        year: year || 'All Years',
         dueDate: new Date(dueDate),
         type,
         authorId: req.user.id,
@@ -69,6 +73,8 @@ router.post('/', authenticate, requireStaff(), async (req, res) => {
         title: deadline.title,
         description: deadline.description,
         course: deadline.course,
+        certificate: deadline.certificate,
+        year: deadline.year,
         dueDate: deadline.dueDate.toISOString().split('T')[0],
         type: deadline.type,
         status: 'pending',
@@ -101,13 +107,15 @@ router.put('/:id', authenticate, async (req, res) => {
       return res.status(403).json({ error: 'Only the author or an admin can update this deadline.' });
     }
 
-    const { title, description, course, dueDate, type } = req.body;
+    const { title, description, course, certificate, year, dueDate, type } = req.body;
     const updated = await prisma.deadline.update({
       where: { id },
       data: {
         ...(title && { title }),
         ...(description && { description }),
         ...(course && { course }),
+        ...(certificate !== undefined && { certificate }),
+        ...(year !== undefined && { year }),
         ...(dueDate && { dueDate: new Date(dueDate) }),
         ...(type && { type })
       },
@@ -121,6 +129,8 @@ router.put('/:id', authenticate, async (req, res) => {
         title: updated.title,
         description: updated.description,
         course: updated.course,
+        certificate: updated.certificate,
+        year: updated.year,
         dueDate: updated.dueDate.toISOString().split('T')[0],
         type: updated.type,
         status: 'pending',

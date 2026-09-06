@@ -9,8 +9,8 @@ import { createClassGroupTitle } from '../utils/whatsapp';
 const initialUsers = [
   { id: '1', email: 'admin@ttu.edu.gh', name: 'Dr. Rockson (Head of Admin)', role: 'admin', password: 'admin123', department: 'Graphic Design' },
   { id: '2', email: 'lecturer@ttu.edu.gh', name: 'Prof. Andrews K. Mensah', role: 'lecturer', password: 'lecturer123', department: 'Graphic Design', courses: ['Layout Design II', 'Vector Graphics I', 'Visual Portfolio Prep'] },
-  { id: '3', email: 'student@ttu.edu.gh', name: 'Emmanuel Rockson', role: 'student', password: 'student123', department: 'Graphic Design', year: 'Year 3', studentId: '0420210088', indexNumber: '0420210088', completedDeadlines: [] },
-  { id: '4', email: 'studenthead@ttu.edu.gh', name: 'Class Representative', role: 'student_head', password: 'head123', department: 'Graphic Design', year: 'Year 3', studentId: '0420210001', indexNumber: '0420210001', completedDeadlines: [] }
+  { id: '3', email: 'student@ttu.edu.gh', name: 'Emmanuel Rockson', role: 'student', password: 'student123', department: 'Graphic Design', certificate: 'BTech', year: 'Year 3', studentId: '0420210088', indexNumber: '0420210088', completedDeadlines: [] },
+  { id: '4', email: 'studenthead@ttu.edu.gh', name: 'Class Representative', role: 'student_head', password: 'head123', department: 'Graphic Design', certificate: 'BTech', year: 'Year 3', studentId: '0420210001', indexNumber: '0420210001', completedDeadlines: [] }
 ];
 
 const initialDeadlines = [
@@ -154,6 +154,14 @@ const CURRENT_USER_STORAGE_KEY = 'ttu_current_user';
 const TIMETABLE_STORAGE_KEY = 'ttu_timetable';
 const CLASS_GROUPS_STORAGE_KEY = 'ttu_class_whatsapp_groups';
 const DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const ALL_CERTIFICATES = 'All Certificates';
+const ALL_YEARS = 'All Years';
+
+const normalizeTarget = (item) => ({
+  ...item,
+  certificate: item?.certificate || ALL_CERTIFICATES,
+  year: item?.year || ALL_YEARS
+});
 
 const sortTimetable = (items) => [...items].sort((a, b) => {
   const dayDiff = DAY_ORDER.indexOf(a.day) - DAY_ORDER.indexOf(b.day);
@@ -166,7 +174,11 @@ const sanitizeProfilePic = (profilePic) => (
 );
 
 const normalizeUserProfilePic = (user) => (
-  user ? { ...user, profilePic: sanitizeProfilePic(user.profilePic) } : user
+  user ? {
+    ...user,
+    certificate: user.certificate || (['student', 'student_head'].includes(user.role) ? 'BTech' : undefined),
+    profilePic: sanitizeProfilePic(user.profilePic)
+  } : user
 );
 
 const fileToDataUrl = (file) => new Promise((resolve, reject) => {
@@ -314,8 +326,9 @@ export const DbProvider = ({ children }) => {
   };
 
   const syncDeadlines = (data) => {
-    setDeadlines(data);
-    localStorage.setItem('ttu_deadlines', JSON.stringify(data));
+    const normalized = data.map(normalizeTarget);
+    setDeadlines(normalized);
+    localStorage.setItem('ttu_deadlines', JSON.stringify(normalized));
   };
 
   const syncEvents = (data) => {
@@ -324,8 +337,9 @@ export const DbProvider = ({ children }) => {
   };
 
   const syncAnnouncements = (data) => {
-    setAnnouncements(data);
-    localStorage.setItem('ttu_announcements', JSON.stringify(data));
+    const normalized = data.map(normalizeTarget);
+    setAnnouncements(normalized);
+    localStorage.setItem('ttu_announcements', JSON.stringify(normalized));
   };
 
   const syncTimetable = (data) => {
@@ -353,8 +367,8 @@ export const DbProvider = ({ children }) => {
         api.users.list()
       ]);
 
-      if (deadlinesRes.success) setDeadlines(deadlinesRes.deadlines);
-      if (announcementsRes.success) setAnnouncements(announcementsRes.announcements);
+      if (deadlinesRes.success) setDeadlines(deadlinesRes.deadlines.map(normalizeTarget));
+      if (announcementsRes.success) setAnnouncements(announcementsRes.announcements.map(normalizeTarget));
       if (eventsRes.success) setEvents(eventsRes.events);
       if (timetableRes.success) setTimetable(timetableRes.timetable);
       if (classGroupsRes.success) setClassGroups(classGroupsRes.classGroups);
@@ -423,7 +437,7 @@ export const DbProvider = ({ children }) => {
           localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(initialUsers));
         }
 
-        if (localDeadlines) setDeadlines(JSON.parse(localDeadlines));
+        if (localDeadlines) setDeadlines(JSON.parse(localDeadlines).map(normalizeTarget));
         else {
           setDeadlines(initialDeadlines);
           localStorage.setItem('ttu_deadlines', JSON.stringify(initialDeadlines));
@@ -435,7 +449,7 @@ export const DbProvider = ({ children }) => {
           localStorage.setItem('ttu_events', JSON.stringify(initialEvents));
         }
 
-        if (localAnnouncements) setAnnouncements(JSON.parse(localAnnouncements));
+        if (localAnnouncements) setAnnouncements(JSON.parse(localAnnouncements).map(normalizeTarget));
         else {
           setAnnouncements(initialAnnouncements);
           localStorage.setItem('ttu_announcements', JSON.stringify(initialAnnouncements));
@@ -564,6 +578,7 @@ export const DbProvider = ({ children }) => {
       ...extraFields,
       completedDeadlines: (role === 'student' || role === 'student_head') ? [] : undefined,
       year: extraFields.year || (role === 'student' || role === 'student_head' ? 'Year 1' : undefined),
+      certificate: extraFields.certificate || (role === 'student' || role === 'student_head' ? 'BTech' : undefined),
       studentId: extraFields.studentId || extraFields.indexNumber || (role === 'student' || role === 'student_head' ? `04${Math.floor(10000000 + Math.random() * 90000000)}` : undefined),
       courses: parseCourses(extraFields.courses).length ? parseCourses(extraFields.courses) : (role === 'lecturer' ? ['General Design'] : [])
     };
@@ -606,6 +621,8 @@ export const DbProvider = ({ children }) => {
       author: currentUser ? currentUser.name : 'Administration',
       authorRole: currentUser ? currentUser.role : 'admin',
       ...deadline,
+      certificate: deadline.certificate || ALL_CERTIFICATES,
+      year: deadline.year || ALL_YEARS,
       status: 'pending'
     };
     syncDeadlines([newDeadline, ...deadlines]);
@@ -760,7 +777,9 @@ export const DbProvider = ({ children }) => {
       author: currentUser ? currentUser.name : 'Administration',
       authorRole: currentUser ? currentUser.role : 'admin',
       date: new Date().toISOString().split('T')[0],
-      ...announcement
+      ...announcement,
+      certificate: announcement.certificate || ALL_CERTIFICATES,
+      year: announcement.year || ALL_YEARS
     };
     syncAnnouncements([newAnn, ...announcements]);
     addNotification(`New announcement posted by ${newAnn.author}: "${newAnn.title}".`);

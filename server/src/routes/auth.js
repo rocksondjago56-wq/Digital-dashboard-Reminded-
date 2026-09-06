@@ -29,6 +29,7 @@ function formatUser(user, completedDeadlines = []) {
     role: user.role,
     department: user.department,
     year: user.year,
+    certificate: user.certificate,
     studentId: user.studentId,
     staffId: user.staffId,
     indexNumber: user.studentId,
@@ -45,7 +46,7 @@ function formatUser(user, completedDeadlines = []) {
  */
 router.post('/signup', async (req, res) => {
   try {
-    const { name, email, password, role = 'student', year, studentId, indexNumber, staffId, designation, courses } = req.body;
+    const { name, email, password, role = 'student', year, certificate, studentId, indexNumber, staffId, designation, courses } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({ error: 'Name, email, and password are required.' });
@@ -68,6 +69,7 @@ router.post('/signup', async (req, res) => {
       role,
       department: 'Graphic Design',
       year: year || (role === 'student' || role === 'student_head' ? 'Year 1' : null),
+      certificate: certificate || (role === 'student' || role === 'student_head' ? 'BTech' : null),
       studentId: studentId || indexNumber || (role === 'student' || role === 'student_head' ? `04${Math.floor(10000000 + Math.random() * 90000000)}` : null),
       staffId: staffId || (role === 'lecturer' ? `LEC-${Math.floor(1000 + Math.random() * 9000)}` : role === 'admin' ? `ADM-${Math.floor(1000 + Math.random() * 9000)}` : null),
       designation: designation || (role === 'admin' ? 'Department Administrator' : null),

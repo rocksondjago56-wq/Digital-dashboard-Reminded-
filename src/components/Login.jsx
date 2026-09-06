@@ -4,6 +4,8 @@ import './Login.css';
 import ttuLogo from '../ttu-logo.png.png';
 import { openWhatsApp, getWhatsAppConfig } from '../utils/whatsapp';
 
+const CERTIFICATE_OPTIONS = ['BTech', 'HND', 'Diploma'];
+
 export default function Login() {
   const { login, signUp } = useContext(DbContext);
   const [isSignUp, setIsSignUp] = useState(false);
@@ -23,6 +25,7 @@ export default function Login() {
 
   // Student extra fields
   const [regYear, setRegYear] = useState('Year 1');
+  const [regCertificate, setRegCertificate] = useState('BTech');
   const [regIndexNumber, setRegIndexNumber] = useState('');
 
   // Lecturer extra fields
@@ -72,8 +75,9 @@ export default function Login() {
     }
 
     const extraFields = {};
-    if (regRole === 'student' || regRole === 'student_head') {
+    if (regRole === 'student') {
       extraFields.year = regYear;
+      extraFields.certificate = regCertificate;
       extraFields.studentId = regIndexNumber.trim() || `04${Math.floor(10000000 + Math.random() * 90000000)}`;
       extraFields.indexNumber = extraFields.studentId;
     } else if (regRole === 'lecturer') {
@@ -229,29 +233,42 @@ export default function Login() {
                   style={{ fontWeight: 600 }}
                 >
                   <option value="student">Student Account</option>
-                  <option value="student_head">Student Head / Class Representative</option>
                   <option value="lecturer">Lecturer / Faculty Member</option>
                   <option value="admin">Department Administrator</option>
                 </select>
               </div>
 
               {/* STUDENT ROLE FIELDS */}
-              {(regRole === 'student' || regRole === 'student_head') && (
-                <div className="form-row-2">
-                  <div className="form-group">
-                    <label htmlFor="regYear">Academic Year</label>
-                    <select 
-                      id="regYear" 
-                      value={regYear} 
-                      onChange={(e) => setRegYear(e.target.value)}
-                    >
-                      <option value="Year 1">Year 1 (Freshman)</option>
-                      <option value="Year 2">Year 2 (Sophomore)</option>
-                      <option value="Year 3">Year 3 (Junior)</option>
-                      <option value="Year 4">Year 4 (Senior)</option>
-                    </select>
-                  </div>
+              {regRole === 'student' && (
+                <>
+                  <div className="form-row-2">
+                    <div className="form-group">
+                      <label htmlFor="regYear">Academic Year</label>
+                      <select
+                        id="regYear"
+                        value={regYear}
+                        onChange={(e) => setRegYear(e.target.value)}
+                      >
+                        <option value="Year 1">Year 1 (Freshman)</option>
+                        <option value="Year 2">Year 2 (Sophomore)</option>
+                        <option value="Year 3">Year 3 (Junior)</option>
+                        <option value="Year 4">Year 4 (Senior)</option>
+                      </select>
+                    </div>
 
+                    <div className="form-group">
+                      <label htmlFor="regCertificate">Certificate Programme</label>
+                      <select
+                        id="regCertificate"
+                        value={regCertificate}
+                        onChange={(e) => setRegCertificate(e.target.value)}
+                      >
+                        {CERTIFICATE_OPTIONS.map(certificate => (
+                          <option key={certificate} value={certificate}>{certificate}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
                   <div className="form-group">
                     <label htmlFor="regIndexNumber">Index / Student ID (Optional)</label>
                     <input
@@ -262,7 +279,7 @@ export default function Login() {
                       onChange={(e) => setRegIndexNumber(e.target.value)}
                     />
                   </div>
-                </div>
+                </>
               )}
 
               {/* LECTURER ROLE FIELDS */}
@@ -328,7 +345,7 @@ export default function Login() {
               )}
 
               <button type="submit" className="btn btn-accent w-full mt-2" disabled={isSubmitting}>
-                {isSubmitting ? 'Creating Account...' : `Create ${regRole === 'admin' ? 'Administrator' : regRole === 'lecturer' ? 'Lecturer' : regRole === 'student_head' ? 'Student Head' : 'Student'} Account`}
+                {isSubmitting ? 'Creating Account...' : `Create ${regRole === 'admin' ? 'Administrator' : regRole === 'lecturer' ? 'Lecturer' : 'Student'} Account`}
               </button>
             </form>
 

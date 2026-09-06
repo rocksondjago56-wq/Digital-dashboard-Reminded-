@@ -32,6 +32,7 @@ async function initDatabase() {
       "role" "UserRole" NOT NULL DEFAULT 'student',
       "department" TEXT NOT NULL DEFAULT 'Graphic Design',
       "year" TEXT,
+      "certificate" TEXT,
       "student_id" TEXT UNIQUE,
       "staff_id" TEXT UNIQUE,
       "designation" TEXT,
@@ -46,6 +47,8 @@ async function initDatabase() {
       "title" TEXT NOT NULL,
       "description" TEXT NOT NULL,
       "course" TEXT NOT NULL,
+      "certificate" TEXT NOT NULL DEFAULT 'All Certificates',
+      "year" TEXT NOT NULL DEFAULT 'All Years',
       "due_date" DATE NOT NULL,
       "type" "DeadlineType" NOT NULL,
       "author_id" TEXT NOT NULL REFERENCES "users"("id") ON DELETE RESTRICT,
@@ -59,6 +62,8 @@ async function initDatabase() {
       "title" TEXT NOT NULL,
       "content" TEXT NOT NULL,
       "category" "AnnouncementCategory" NOT NULL,
+      "certificate" TEXT NOT NULL DEFAULT 'All Certificates',
+      "year" TEXT NOT NULL DEFAULT 'All Years',
       "is_pinned" BOOLEAN NOT NULL DEFAULT false,
       "author_id" TEXT NOT NULL REFERENCES "users"("id") ON DELETE RESTRICT,
       "created_at" TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -102,7 +107,13 @@ async function initDatabase() {
       "head_phone" TEXT NOT NULL,
       "invite_link" TEXT NOT NULL DEFAULT '',
       "updated_at" TIMESTAMPTZ NOT NULL DEFAULT now()
-    );`
+    );`,
+
+    `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "certificate" TEXT;`,
+    `ALTER TABLE "deadlines" ADD COLUMN IF NOT EXISTS "certificate" TEXT NOT NULL DEFAULT 'All Certificates';`,
+    `ALTER TABLE "deadlines" ADD COLUMN IF NOT EXISTS "year" TEXT NOT NULL DEFAULT 'All Years';`,
+    `ALTER TABLE "announcements" ADD COLUMN IF NOT EXISTS "certificate" TEXT NOT NULL DEFAULT 'All Certificates';`,
+    `ALTER TABLE "announcements" ADD COLUMN IF NOT EXISTS "year" TEXT NOT NULL DEFAULT 'All Years';`
   ];
 
   try {

@@ -11,6 +11,16 @@ import {
 } from '../utils/whatsapp';
 
 const CLASS_YEAR_OPTIONS = ['Year 1', 'Year 2', 'Year 3', 'Year 4'];
+const ALL_CERTIFICATES = 'All Certificates';
+const ALL_YEARS = 'All Years';
+
+const isForCurrentStudent = (item, student) => {
+  const targetCertificate = item.certificate || ALL_CERTIFICATES;
+  const targetYear = item.year || ALL_YEARS;
+  const certificateMatches = targetCertificate === ALL_CERTIFICATES || targetCertificate === student?.certificate;
+  const yearMatches = targetYear === ALL_YEARS || targetYear === student?.year;
+  return certificateMatches && yearMatches;
+};
 
 export default function StudentDashboard() {
   const {
@@ -49,10 +59,7 @@ export default function StudentDashboard() {
   const currentStudentClassGroup = (classGroups || []).find(group => group.year === currentUser?.year);
   const generatedClassTitle = createClassGroupTitle(classGroupYear);
   const visibleTimetable = (timetable || []).filter(slot => (
-    canManageTimetable ||
-    !slot.year ||
-    slot.year === 'All Years' ||
-    slot.year === currentUser.year
+    canManageTimetable || isForCurrentStudent(slot, currentUser)
   ));
   const profilePhotoSrc = typeof currentUser?.profilePic === 'string' && currentUser.profilePic.trim()
     ? currentUser.profilePic
@@ -95,7 +102,8 @@ export default function StudentDashboard() {
   // Filter deadlines
   const completedList = currentUser.completedDeadlines || [];
 
-  const filteredDeadlines = deadlines.filter(d => {
+  const visibleDeadlines = (deadlines || []).filter(d => isForCurrentStudent(d, currentUser));
+  const filteredDeadlines = visibleDeadlines.filter(d => {
     const isCompleted = completedList.includes(d.id);
 
     if (activeTab === 'completed') return isCompleted;
@@ -109,7 +117,8 @@ export default function StudentDashboard() {
   });
 
   // Filter announcements
-  const filteredAnnouncements = announcements.filter(a => {
+  const filteredAnnouncements = (announcements || []).filter(a => {
+    if (!isForCurrentStudent(a, currentUser)) return false;
     if (announcementFilter === 'all') return true;
     return a.category === announcementFilter;
   });
@@ -236,12 +245,12 @@ export default function StudentDashboard() {
           </div>
           <div className="hero-text">
             <h1>{currentUser?.name || 'Student Dashboard'}</h1>
-            <p>Signed in as <strong>{currentUser.name}</strong> ({currentUser.year || 'Year 1'} Graphic Design). Track your assignments, download course notes, and check submission deadlines.</p>
+            <p>Signed in as <strong>{currentUser.name}</strong> ({currentUser.certificate || 'BTech'} {currentUser.year || 'Year 1'} Graphic Design). Track your assignments, download course notes, and check submission deadlines.</p>
           </div>
         </div>
         <div className="hero-stats">
           <div className="hero-stat-card">
-            <span className="stat-num">{deadlines.filter(d => !completedList.includes(d.id)).length}</span>
+            <span className="stat-num">{visibleDeadlines.filter(d => !completedList.includes(d.id)).length}</span>
             <span className="stat-label">Pending Deadlines</span>
           </div>
           <div className="hero-stat-card">
@@ -302,6 +311,8 @@ export default function StudentDashboard() {
                             }`}>
                             {d.type}
                           </span>
+                          <span className="target-badge">{d.certificate || ALL_CERTIFICATES}</span>
+                          <span className="target-badge">{d.year || ALL_YEARS}</span>
                         </div>
                         <h3 className="deadline-title">{d.title}</h3>
                         <p className="deadline-desc">{d.description}</p>
