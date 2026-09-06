@@ -176,4 +176,38 @@ router.put('/:id/profile-pic', authenticate, async (req, res) => {
   }
 });
 
+/**
+ * DELETE /api/users/:id
+ * Delete a user account (own account OR admin deleting another user).
+ */
+router.delete('/:id', authenticate, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Permission check: User can delete themselves, or Admin can delete any user
+    if (req.user.id !== id && req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'You do not have permission to delete this account.' });
+    }
+
+    const targetUser = await prisma.user.findUnique({ where: { id } });
+    if (!targetUser) {
+      return res.status(404).json({ error: 'User not found.' });
+    }
+
+    // Clean up dependent resources in a single transaction
+    await prisma.$transaction([
+      prisma.deadlineCompletion.deleteMany({ where: { studentId: id } }),
+      prisma.deadline.deleteMany({ where: { authorId: id } }),
+      prisma.announcement.deleteMany({ where: { authorId: id } }),
+      prisma.event.deleteMany({ where: { authorId: id } }),
+      prisma.user.delete({ where: { id } })
+    ]);
+
+    res.json({ success: true, message: 'Account deleted successfully.' });
+  } catch (error) {
+    console.error('Delete user error:', error);
+    res.status(500).json({ error: 'Failed to delete account.' });
+  }
+});
+
 export default router;

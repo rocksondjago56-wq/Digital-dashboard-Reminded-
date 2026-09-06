@@ -185,7 +185,11 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify({ profilePic })
       }),
-    provision: (identity) => request('/users/provision', { method: 'POST', body: JSON.stringify(identity) })
+    provision: (identity) => request('/users/provision', { method: 'POST', body: JSON.stringify(identity) }),
+    delete: (id) =>
+      request(`/users/${id}`, {
+        method: 'DELETE'
+      })
   },
 
   // --- Timetable ---

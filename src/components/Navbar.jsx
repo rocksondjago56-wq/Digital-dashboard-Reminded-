@@ -5,8 +5,10 @@ import ttuLogo from '../ttu-logo.png.png';
 import { openWhatsApp, getWhatsAppConfig } from '../utils/whatsapp';
 
 export default function Navbar() {
-  const { currentUser, logout, notifications, markAllNotificationsAsRead, updateUserProfilePic } = useContext(DbContext);
+  const { currentUser, logout, notifications, markAllNotificationsAsRead, updateUserProfilePic, deleteUser } = useContext(DbContext);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeletingSelf, setIsDeletingSelf] = useState(false);
   const [avatarError, setAvatarError] = useState('');
   const [isUpdatingAvatar, setIsUpdatingAvatar] = useState(false);
   const dropdownRef = useRef(null);
@@ -28,6 +30,16 @@ export default function Navbar() {
   const handleAvatarClick = () => {
     if (fileInputRef.current) {
       fileInputRef.current.click();
+    }
+  };
+
+  const handleConfirmDeleteSelf = async () => {
+    setIsDeletingSelf(true);
+    try {
+      await deleteUser(currentUser.id);
+    } finally {
+      setIsDeletingSelf(false);
+      setShowDeleteModal(false);
     }
   };
 
@@ -195,10 +207,53 @@ export default function Navbar() {
           )}
         </div>
 
+        <button
+          onClick={() => setShowDeleteModal(true)}
+          className="navbar-icon-btn btn-delete-account-icon"
+          title="Delete Account"
+          aria-label="Delete Account"
+        >
+          <span>🗑️</span>
+        </button>
+
         <button onClick={logout} className="btn btn-secondary logout-btn">
           <span>🚪</span> <span className="desktop-only">Sign Out</span>
         </button>
       </div>
+
+      {/* Delete Account Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="modal-backdrop animate-fade-in" onClick={() => setShowDeleteModal(false)}>
+          <div className="delete-account-modal glass-panel" onClick={(e) => e.stopPropagation()}>
+            <div className="delete-modal-header">
+              <span className="warning-icon">⚠️</span>
+              <h3>Delete Your Account?</h3>
+            </div>
+            <p className="delete-modal-body">
+              Are you sure you want to delete your account, <strong>{currentUser.name}</strong>?
+              This action is <strong>permanent</strong> and cannot be undone. Your access to the TTU Graphic Design Portal will be removed.
+            </p>
+            <div className="delete-modal-actions">
+              <button
+                type="button"
+                onClick={() => setShowDeleteModal(false)}
+                className="btn btn-secondary"
+                disabled={isDeletingSelf}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteSelf}
+                className="btn btn-danger"
+                disabled={isDeletingSelf}
+              >
+                {isDeletingSelf ? 'Deleting...' : 'Yes, Delete My Account'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </nav>
   );
 }

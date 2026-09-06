@@ -1074,6 +1074,40 @@ export const DbProvider = ({ children }) => {
     return { success: true };
   };
 
+  const deleteUser = async (userId) => {
+    const isSelf = currentUser && currentUser.id === userId;
+
+    if (useApi) {
+      try {
+        const result = await api.users.delete(userId);
+        if (result.success) {
+          if (isSelf) {
+            logout();
+          } else {
+            await refreshRemoteData();
+          }
+          addNotification(isSelf ? 'Your account has been deleted.' : 'Account deleted.');
+          return { success: true };
+        }
+        return { success: false, message: result.error || 'Failed to delete account.' };
+      } catch (error) {
+        return { success: false, message: error.message };
+      }
+    }
+
+    // Local fallback mode
+    const updatedUsers = users.filter(u => u.id !== userId);
+    syncUsers(updatedUsers);
+
+    if (isSelf) {
+      logout();
+    } else {
+      addNotification('User account deleted.');
+    }
+
+    return { success: true };
+  };
+
   // ─── Context Value ────────────────────────────────────────────────────
 
   return (
@@ -1110,6 +1144,7 @@ export const DbProvider = ({ children }) => {
       updateUserRole,
       provisionIdentity,
       updateUserProfilePic,
+      deleteUser,
       markAllNotificationsAsRead
     }}>
       {children}

@@ -32,7 +32,8 @@ export default function AdminDashboard() {
     saveClassWhatsAppGroup,
     deleteClassWhatsAppGroup,
     updateUserRole,
-    provisionIdentity
+    provisionIdentity,
+    deleteUser
   } = useContext(DbContext);
 
   const [adminTab, setAdminTab] = useState('announcements'); // announcements, events, deadlines, timetable, whatsapp, users
@@ -899,6 +900,7 @@ export default function AdminDashboard() {
                     <th>Email Address</th>
                     <th>Current Access Level</th>
                     <th>Edit Role Permission</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -929,6 +931,24 @@ export default function AdminDashboard() {
                           <option value="lecturer">Lecturer</option>
                           <option value="admin">Administrator</option>
                         </select>
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const isSelf = u.id === currentUser?.id;
+                            const promptMsg = isSelf
+                              ? "You are about to delete your OWN administrator account! Are you sure? You will be signed out immediately."
+                              : `Are you sure you want to delete the account for ${u.name} (${u.email})? This action cannot be undone.`;
+                            if (window.confirm(promptMsg)) {
+                              deleteUser(u.id);
+                            }
+                          }}
+                          className="btn-icon-danger btn-sm"
+                          style={{ padding: '0.35rem 0.6rem', fontSize: '0.8rem', borderRadius: '6px' }}
+                        >
+                          Delete Account
+                        </button>
                       </td>
                     </tr>
                   ))}
