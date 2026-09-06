@@ -59,16 +59,19 @@ router.get('/', authenticate, async (req, res) => {
 
 router.post('/provision', authenticate, requireAdmin(), async (req, res) => {
   try {
-    const { name, role, indexNumber, staffId, year, certificate, courses, designation } = req.body;
-    if (!name || !['student', 'lecturer'].includes(role)) {
-      return res.status(400).json({ error: 'Name and a student or lecturer role are required.' });
+    const { name, role, indexNumber, staffId, email: suppliedEmail, year, certificate, courses, designation } = req.body;
+    if (!name || !['student', 'lecturer', 'admin'].includes(role)) {
+      return res.status(400).json({ error: 'Name and a student, lecturer, or administrator role are required.' });
     }
 
     const identifier = role === 'student' ? indexNumber?.trim() : staffId?.trim();
-    if (!identifier) return res.status(400).json({ error: role === 'student' ? 'Student index number is required.' : 'Lecturer ID is required.' });
+    if (!identifier) return res.status(400).json({ error: role === 'student' ? 'Student index number is required.' : 'Staff ID is required.' });
     if (role === 'student' && (!year || !certificate)) return res.status(400).json({ error: 'Student year and certificate programme are required.' });
+    if (role === 'admin' && !suppliedEmail?.trim()) return res.status(400).json({ error: 'Administrator email is required.' });
 
-    const email = `${identifier.replace(/[^a-z0-9]/gi, '').toLowerCase()}@ttu.edu.gh`;
+    const email = role === 'admin'
+      ? suppliedEmail.trim().toLowerCase()
+      : `${identifier.replace(/[^a-z0-9]/gi, '').toLowerCase()}@ttu.edu.gh`;
     const exists = await prisma.user.findFirst({ where: { OR: [{ email }, ...(role === 'student' ? [{ studentId: identifier }] : [{ staffId: identifier }])] } });
     if (exists) return res.status(409).json({ error: 'An identity with this email or ID already exists.' });
 
@@ -81,11 +84,11 @@ router.post('/provision', authenticate, requireAdmin(), async (req, res) => {
         role,
         department: 'Graphic Design',
         studentId: role === 'student' ? identifier : null,
-        staffId: role === 'lecturer' ? identifier : null,
+        staffId: role === 'student' ? null : identifier,
         year: role === 'student' ? year : null,
         certificate: role === 'student' ? certificate : null,
         courses: role === 'lecturer' ? (Array.isArray(courses) ? courses : String(courses || '').split(',').map(course => course.trim()).filter(Boolean)) : [],
-        designation: role === 'lecturer' ? designation || 'Lecturer' : null,
+        designation: role === 'lecturer' ? designation || 'Lecturer' : role === 'admin' ? designation || 'Department Administrator' : null,
         isVerified: false,
         verificationCodeHash: await bcrypt.hash(code, 10),
         verificationExpiresAt: new Date(Date.now() + 15 * 60 * 1000)

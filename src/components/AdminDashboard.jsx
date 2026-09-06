@@ -82,6 +82,8 @@ export default function AdminDashboard() {
   const [identityYear, setIdentityYear] = useState('Year 1');
   const [identityCertificate, setIdentityCertificate] = useState('BTech');
   const [identityCourses, setIdentityCourses] = useState('');
+  const [identityEmail, setIdentityEmail] = useState('');
+  const [identityDesignation, setIdentityDesignation] = useState('Department Administrator');
   const [identityStatus, setIdentityStatus] = useState('');
   const [identityError, setIdentityError] = useState('');
 
@@ -89,7 +91,7 @@ export default function AdminDashboard() {
     e.preventDefault();
     setIdentityStatus('');
     setIdentityError('');
-    const result = await provisionIdentity({ name: identityName, role: identityRole, indexNumber: identityIndex, staffId: identityStaffId, year: identityYear, certificate: identityCertificate, courses: identityCourses });
+    const result = await provisionIdentity({ name: identityName, role: identityRole, indexNumber: identityIndex, staffId: identityStaffId, email: identityEmail, designation: identityDesignation, year: identityYear, certificate: identityCertificate, courses: identityCourses });
     if (!result?.success) {
       setIdentityError(result?.message || 'Could not provision this identity.');
       return;
@@ -99,6 +101,7 @@ export default function AdminDashboard() {
     setIdentityIndex('');
     setIdentityStaffId('');
     setIdentityCourses('');
+    setIdentityEmail('');
   };
 
   // Submit handlers
@@ -943,7 +946,7 @@ export default function AdminDashboard() {
                 <div className="form-group">
                   <label>Identity Type</label>
                   <select value={identityRole} onChange={(e) => setIdentityRole(e.target.value)}>
-                    <option value="student">Student</option><option value="lecturer">Lecturer</option>
+                    <option value="student">Student</option><option value="lecturer">Lecturer</option><option value="admin">Department Administrator</option>
                   </select>
                 </div>
                 <div className="form-group">
@@ -960,13 +963,22 @@ export default function AdminDashboard() {
                   </div>
                   <p className="identity-help">The system creates the TTU email as indexnumber@ttu.edu.gh and sends an activation code.</p>
                 </>
-              ) : (
+              ) : identityRole === 'lecturer' ? (
                 <>
                   <div className="form-row-2">
                     <div className="form-group"><label>Lecturer ID</label><input value={identityStaffId} onChange={(e) => setIdentityStaffId(e.target.value)} placeholder="LEC-0492" required /></div>
                     <div className="form-group"><label>Courses Taught</label><input value={identityCourses} onChange={(e) => setIdentityCourses(e.target.value)} placeholder="Course one, Course two" required /></div>
                   </div>
                   <p className="identity-help">The system creates the TTU email from the lecturer ID and sends an activation code.</p>
+                </>
+              ) : (
+                <>
+                  <div className="form-row-2">
+                    <div className="form-group"><label>Administrator Staff ID</label><input value={identityStaffId} onChange={(e) => setIdentityStaffId(e.target.value)} placeholder="ADM-1001" required /></div>
+                    <div className="form-group"><label>School Email for Verification</label><input type="email" value={identityEmail} onChange={(e) => setIdentityEmail(e.target.value)} placeholder="name@ttu.edu.gh" required /></div>
+                  </div>
+                  <div className="form-group"><label>Administrative Designation</label><input value={identityDesignation} onChange={(e) => setIdentityDesignation(e.target.value)} placeholder="Department Administrator" required /></div>
+                  <p className="identity-help">The verification code is sent to the administrator email entered here. Activation then automatically grants administrator access.</p>
                 </>
               )}
               <button type="submit" className="btn btn-primary">Provision Identity and Send Code</button>
