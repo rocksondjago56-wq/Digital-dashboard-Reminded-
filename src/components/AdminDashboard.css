@@ -170,6 +170,19 @@
   margin: 0;
 }
 
+.identity-help {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.84rem;
+}
+
+.identity-error {
+  margin: 0;
+  color: #b91c1c;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
 .form-row-3 {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

@@ -38,6 +38,9 @@ async function initDatabase() {
       "designation" TEXT,
       "courses" TEXT[] NOT NULL DEFAULT '{}',
       "profile_picture_url" TEXT,
+      "is_verified" BOOLEAN NOT NULL DEFAULT true,
+      "verification_code_hash" TEXT,
+      "verification_expires_at" TIMESTAMPTZ,
       "created_at" TIMESTAMPTZ NOT NULL DEFAULT now(),
       "updated_at" TIMESTAMPTZ NOT NULL DEFAULT now()
     );`,
@@ -113,7 +116,10 @@ async function initDatabase() {
     `ALTER TABLE "deadlines" ADD COLUMN IF NOT EXISTS "certificate" TEXT NOT NULL DEFAULT 'All Certificates';`,
     `ALTER TABLE "deadlines" ADD COLUMN IF NOT EXISTS "year" TEXT NOT NULL DEFAULT 'All Years';`,
     `ALTER TABLE "announcements" ADD COLUMN IF NOT EXISTS "certificate" TEXT NOT NULL DEFAULT 'All Certificates';`,
-    `ALTER TABLE "announcements" ADD COLUMN IF NOT EXISTS "year" TEXT NOT NULL DEFAULT 'All Years';`
+    `ALTER TABLE "announcements" ADD COLUMN IF NOT EXISTS "year" TEXT NOT NULL DEFAULT 'All Years';`,
+    `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "is_verified" BOOLEAN NOT NULL DEFAULT true;`,
+    `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "verification_code_hash" TEXT;`,
+    `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "verification_expires_at" TIMESTAMPTZ;`
   ];
 
   try {

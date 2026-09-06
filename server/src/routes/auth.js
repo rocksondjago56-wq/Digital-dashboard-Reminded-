@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { authenticate } from '../middleware/auth.js';
+import { sendVerificationEmail } from '../services/email.js';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -36,6 +37,7 @@ function formatUser(user, completedDeadlines = []) {
     designation: user.designation,
     courses: user.courses || [],
     profilePic: user.profilePictureUrl,
+    isVerified: user.isVerified,
     completedDeadlines
   };
 }
@@ -91,6 +93,74 @@ router.post('/signup', async (req, res) => {
   }
 });
 
+const findIdentity = (identifier) => {
+  const term = identifier.trim().toLowerCase();
+  return prisma.user.findFirst({
+    where: {
+      OR: [
+        { email: term },
+        { studentId: { equals: term, mode: 'insensitive' } },
+        { staffId: { equals: term, mode: 'insensitive' } }
+      ]
+    }
+  });
+};
+
+router.post('/request-verification', async (req, res) => {
+  try {
+    const { identifier } = req.body;
+    if (!identifier) return res.status(400).json({ error: 'Enter your TTU email, index number, or lecturer ID.' });
+
+    const user = await findIdentity(identifier);
+    if (!user) return res.status(404).json({ error: 'No preloaded department identity was found.' });
+
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    const verificationCodeHash = await bcrypt.hash(code, 10);
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { verificationCodeHash, verificationExpiresAt: new Date(Date.now() + 15 * 60 * 1000) }
+    });
+    const delivery = await sendVerificationEmail({ to: user.email, name: user.name, code });
+    res.json({
+      success: true,
+      message: delivery.delivered ? 'A verification code was sent to your TTU email.' : 'Verification code created. Configure SMTP to deliver it by email.',
+      developmentCode: delivery.developmentCode
+    });
+  } catch (error) {
+    console.error('Request verification error:', error);
+    res.status(500).json({ error: 'Could not send the verification code.' });
+  }
+});
+
+router.post('/activate-account', async (req, res) => {
+  try {
+    const { identifier, code, password } = req.body;
+    if (!identifier || !code || !password) return res.status(400).json({ error: 'Identifier, verification code, and password are required.' });
+    if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters.' });
+
+    const user = await findIdentity(identifier);
+    if (!user || !user.verificationCodeHash || !user.verificationExpiresAt) {
+      return res.status(400).json({ error: 'Request a new verification code before activating your account.' });
+    }
+    if (user.verificationExpiresAt < new Date()) return res.status(400).json({ error: 'This verification code has expired. Request another code.' });
+    if (!(await bcrypt.compare(code, user.verificationCodeHash))) return res.status(400).json({ error: 'The verification code is incorrect.' });
+
+    const activated = await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash: await bcrypt.hash(password, 12),
+        isVerified: true,
+        verificationCodeHash: null,
+        verificationExpiresAt: null
+      }
+    });
+    res.json({ success: true, message: `Account verified for ${activated.name}. You can now sign in with your TTU email.` });
+  } catch (error) {
+    console.error('Activate account error:', error);
+    res.status(500).json({ error: 'Could not activate your account.' });
+  }
+});
+
 /**
  * POST /api/auth/login
  * Authenticate with email, name, studentId, staffId + password.
@@ -119,6 +189,10 @@ router.post('/login', async (req, res) => {
 
     if (!user) {
       return res.status(401).json({ error: 'Account not found. Use your email, full name, index number, or staff ID.' });
+    }
+
+    if (!user.isVerified) {
+      return res.status(403).json({ error: 'This department identity has not been verified. Activate the account first.' });
     }
 
     // Verify password

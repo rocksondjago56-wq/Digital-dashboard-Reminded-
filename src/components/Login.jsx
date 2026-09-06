@@ -7,8 +7,9 @@ import { openWhatsApp, getWhatsAppConfig } from '../utils/whatsapp';
 const CERTIFICATE_OPTIONS = ['BTech', 'HND', 'Diploma'];
 
 export default function Login() {
-  const { login, signUp } = useContext(DbContext);
+  const { login, signUp, requestVerification, activateAccount } = useContext(DbContext);
   const [isSignUp, setIsSignUp] = useState(false);
+  const [isActivating, setIsActivating] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -16,6 +17,11 @@ export default function Login() {
   // Login State
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [activationIdentifier, setActivationIdentifier] = useState('');
+  const [activationCode, setActivationCode] = useState('');
+  const [activationPassword, setActivationPassword] = useState('');
+  const [codeRequested, setCodeRequested] = useState(false);
+  const [developmentCode, setDevelopmentCode] = useState('');
 
   // Sign Up State
   const [regName, setRegName] = useState('');
@@ -107,6 +113,55 @@ export default function Login() {
     setSuccessMsg('');
   };
 
+  const openActivation = () => {
+    setIsSignUp(false);
+    setIsActivating(true);
+    setError('');
+    setSuccessMsg('');
+    setCodeRequested(false);
+    setDevelopmentCode('');
+  };
+
+  const handleRequestVerification = async () => {
+    setError('');
+    setSuccessMsg('');
+    if (!activationIdentifier.trim()) {
+      setError('Enter your TTU email, index number, or lecturer ID.');
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const result = await requestVerification(activationIdentifier);
+      if (!result.success) setError(result.message);
+      else {
+        setCodeRequested(true);
+        setDevelopmentCode(result.developmentCode || '');
+        setSuccessMsg(result.message);
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleActivateAccount = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccessMsg('');
+    setIsSubmitting(true);
+    try {
+      const result = await activateAccount(activationIdentifier, activationCode, activationPassword);
+      if (!result.success) setError(result.message);
+      else {
+        setSuccessMsg(result.message);
+        setIsActivating(false);
+        setActivationCode('');
+        setActivationPassword('');
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleWhatsAppHelp = () => {
     const config = getWhatsAppConfig();
     openWhatsApp({
@@ -122,7 +177,7 @@ export default function Login() {
           <div className="ttu-logo-sim">
             <img src={ttuLogo} alt="Takoradi Technical University Logo" className="ttu-logo-img" />
           </div>
-          <h1>{isSignUp ? 'Create Portal Account' : 'Department Portal Sign In'}</h1>
+          <h1>{isActivating ? 'Activate TTU Portal Account' : isSignUp ? 'Create Portal Account' : 'Department Portal Sign In'}</h1>
           <p className="subtitle">Graphic Design Dept · Reminder & Announcement System</p>
         </div>
 
@@ -147,7 +202,27 @@ export default function Login() {
         )}
 
         {/* SIGN IN FORM */}
-        {!isSignUp ? (
+        {isActivating ? (
+          <>
+            <form onSubmit={handleActivateAccount} className="login-form">
+              <div className="form-group">
+                <label htmlFor="activationIdentifier">TTU Email, Index Number, or Lecturer ID</label>
+                <input id="activationIdentifier" value={activationIdentifier} onChange={(e) => setActivationIdentifier(e.target.value)} placeholder="0420210088 or LEC-0492" required />
+              </div>
+              {!codeRequested ? (
+                <button type="button" className="btn btn-primary w-full mt-2" disabled={isSubmitting} onClick={handleRequestVerification}>Send Verification Code</button>
+              ) : (
+                <>
+                  <div className="form-group"><label htmlFor="activationCode">Verification Code</label><input id="activationCode" value={activationCode} onChange={(e) => setActivationCode(e.target.value)} placeholder="6-digit code" required /></div>
+                  <div className="form-group"><label htmlFor="activationPassword">Create Password</label><input id="activationPassword" type="password" value={activationPassword} onChange={(e) => setActivationPassword(e.target.value)} placeholder="At least 6 characters" required /></div>
+                  {developmentCode && <p className="development-code">Development verification code: {developmentCode}</p>}
+                  <button type="submit" className="btn btn-accent w-full mt-2" disabled={isSubmitting}>{isSubmitting ? 'Verifying...' : 'Verify and Set Password'}</button>
+                </>
+              )}
+            </form>
+            <div className="switch-mode-text mt-3"><p><span onClick={() => setIsActivating(false)} className="switch-mode-link">Back to Sign In</span></p></div>
+          </>
+        ) : !isSignUp ? (
           <>
             <form onSubmit={handleSignIn} className="login-form">
               <div className="form-group">
@@ -180,7 +255,7 @@ export default function Login() {
             </form>
 
             <div className="switch-mode-text mt-3">
-              <p>Don't have an account? <span onClick={toggleMode} className="switch-mode-link">Sign Up Now</span></p>
+              <p><span onClick={openActivation} className="switch-mode-link">Activate your preloaded TTU account</span></p>
             </div>
           </>
         ) : (

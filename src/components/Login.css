@@ -129,6 +129,17 @@
   color: var(--ttu-blue);
 }
 
+.development-code {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  color: #075985;
+  background: #e0f2fe;
+  border: 1px solid #bae6fd;
+  border-radius: var(--radius-sm);
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
 @media (max-width: 560px) {
   .login-container {
     align-items: flex-start;

@@ -591,6 +591,38 @@ export const DbProvider = ({ children }) => {
     return { success: true, user: newUser };
   };
 
+  const requestVerification = async (identifier) => {
+    if (useApi) {
+      try {
+        return await api.auth.requestVerification(identifier);
+      } catch (error) {
+        return { success: false, message: error.message };
+      }
+    }
+    const user = (getSavedUsers() || users).find(item => [item.email, item.studentId, item.staffId].filter(Boolean).some(value => value.toLowerCase() === identifier.trim().toLowerCase()));
+    if (!user) return { success: false, message: 'No preloaded department identity was found.' };
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    const updated = users.map(item => item.id === user.id ? { ...item, verificationCode: code, isVerified: false } : item);
+    syncUsers(updated);
+    return { success: true, message: 'Verification code created for this preloaded identity.', developmentCode: code };
+  };
+
+  const activateAccount = async (identifier, code, password) => {
+    if (useApi) {
+      try {
+        return await api.auth.activateAccount(identifier, code, password);
+      } catch (error) {
+        return { success: false, message: error.message };
+      }
+    }
+    const term = identifier.trim().toLowerCase();
+    const user = users.find(item => [item.email, item.studentId, item.staffId].filter(Boolean).some(value => value.toLowerCase() === term));
+    if (!user || user.verificationCode !== code) return { success: false, message: 'The verification code is incorrect.' };
+    const updatedUsers = users.map(item => item.id === user.id ? { ...item, password, isVerified: true, verificationCode: undefined } : item);
+    syncUsers(updatedUsers);
+    return { success: true, message: 'Account verified. You can now sign in.' };
+  };
+
   const logout = async () => {
     if (currentUser) {
       addNotification(`User ${currentUser.name} logged out.`);
@@ -971,6 +1003,35 @@ export const DbProvider = ({ children }) => {
     addNotification(`User role updated for user ID: ${userId} to ${newRole}.`);
   };
 
+  const provisionIdentity = async (identity) => {
+    if (useApi) {
+      try {
+        const result = await api.users.provision(identity);
+        if (result.success) await refreshRemoteData();
+        return result;
+      } catch (error) {
+        return { success: false, message: error.message };
+      }
+    }
+    const identifier = identity.role === 'student' ? identity.indexNumber?.trim() : identity.staffId?.trim();
+    if (!identifier) return { success: false, message: 'An index number or lecturer ID is required.' };
+    const email = `${identifier.replace(/[^a-z0-9]/gi, '').toLowerCase()}@ttu.edu.gh`;
+    if (users.some(user => user.email === email || user.studentId === identifier || user.staffId === identifier)) return { success: false, message: 'An identity with this email or ID already exists.' };
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    const user = {
+      id: `u_${Date.now()}`,
+      name: identity.name.trim(), email, role: identity.role, department: 'Graphic Design', isVerified: false, verificationCode: code,
+      studentId: identity.role === 'student' ? identifier : undefined,
+      indexNumber: identity.role === 'student' ? identifier : undefined,
+      staffId: identity.role === 'lecturer' ? identifier : undefined,
+      year: identity.role === 'student' ? identity.year : undefined,
+      certificate: identity.role === 'student' ? identity.certificate : undefined,
+      courses: identity.role === 'lecturer' ? parseCourses(identity.courses) : []
+    };
+    syncUsers([...users, user]);
+    return { success: true, user, message: 'Identity provisioned.', developmentCode: code };
+  };
+
   const updateUserProfilePic = async (userId, newProfilePic) => {
     let picData = '';
     try {
@@ -1025,6 +1086,8 @@ export const DbProvider = ({ children }) => {
       login,
       logout,
       signUp,
+      requestVerification,
+      activateAccount,
       addDeadline,
       updateDeadline,
       deleteDeadline,
@@ -1041,6 +1104,7 @@ export const DbProvider = ({ children }) => {
       saveClassWhatsAppGroup,
       deleteClassWhatsAppGroup,
       updateUserRole,
+      provisionIdentity,
       updateUserProfilePic,
       markAllNotificationsAsRead
     }}>

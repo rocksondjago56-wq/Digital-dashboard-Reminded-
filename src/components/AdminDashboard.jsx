@@ -31,7 +31,8 @@ export default function AdminDashboard() {
     deleteTimetableSlot,
     saveClassWhatsAppGroup,
     deleteClassWhatsAppGroup,
-    updateUserRole
+    updateUserRole,
+    provisionIdentity
   } = useContext(DbContext);
 
   const [adminTab, setAdminTab] = useState('announcements'); // announcements, events, deadlines, timetable, whatsapp, users
@@ -74,6 +75,31 @@ export default function AdminDashboard() {
   const [wgHeadPhone, setWgHeadPhone] = useState('');
   const [wgInviteLink, setWgInviteLink] = useState('');
   const [wgStatus, setWgStatus] = useState('');
+  const [identityRole, setIdentityRole] = useState('student');
+  const [identityName, setIdentityName] = useState('');
+  const [identityIndex, setIdentityIndex] = useState('');
+  const [identityStaffId, setIdentityStaffId] = useState('');
+  const [identityYear, setIdentityYear] = useState('Year 1');
+  const [identityCertificate, setIdentityCertificate] = useState('BTech');
+  const [identityCourses, setIdentityCourses] = useState('');
+  const [identityStatus, setIdentityStatus] = useState('');
+  const [identityError, setIdentityError] = useState('');
+
+  const handleProvisionIdentity = async (e) => {
+    e.preventDefault();
+    setIdentityStatus('');
+    setIdentityError('');
+    const result = await provisionIdentity({ name: identityName, role: identityRole, indexNumber: identityIndex, staffId: identityStaffId, year: identityYear, certificate: identityCertificate, courses: identityCourses });
+    if (!result?.success) {
+      setIdentityError(result?.message || 'Could not provision this identity.');
+      return;
+    }
+    setIdentityStatus(`${result.user.email} provisioned.${result.developmentCode ? ` Development code: ${result.developmentCode}` : ''}`);
+    setIdentityName('');
+    setIdentityIndex('');
+    setIdentityStaffId('');
+    setIdentityCourses('');
+  };
 
   // Submit handlers
   const handleAnnSubmit = (e) => {
@@ -351,6 +377,12 @@ export default function AdminDashboard() {
           onClick={() => switchAdminTab('users')}
         >
           👥 User Administration
+        </button>
+        <button
+          className={`admin-nav-btn ${adminTab === 'identities' ? 'active' : ''}`}
+          onClick={() => switchAdminTab('identities')}
+        >
+          Provision Identities
         </button>
       </div>
 
@@ -899,6 +931,55 @@ export default function AdminDashboard() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          </div>
+        )}
+
+        {adminTab === 'identities' && (
+          <div>
+            <div className="tab-actions-row"><h3>Student and Lecturer Identity Provisioning</h3></div>
+            <form onSubmit={handleProvisionIdentity} className="admin-action-form identity-form">
+              <div className="form-row-2">
+                <div className="form-group">
+                  <label>Identity Type</label>
+                  <select value={identityRole} onChange={(e) => setIdentityRole(e.target.value)}>
+                    <option value="student">Student</option><option value="lecturer">Lecturer</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Full Name</label>
+                  <input value={identityName} onChange={(e) => setIdentityName(e.target.value)} placeholder="Full legal name" required />
+                </div>
+              </div>
+              {identityRole === 'student' ? (
+                <>
+                  <div className="form-row-3">
+                    <div className="form-group"><label>Approved Index Number</label><input value={identityIndex} onChange={(e) => setIdentityIndex(e.target.value)} placeholder="0420210088" required /></div>
+                    <div className="form-group"><label>Certificate</label><select value={identityCertificate} onChange={(e) => setIdentityCertificate(e.target.value)}><option value="BTech">BTech</option><option value="HND">HND</option><option value="Diploma">Diploma</option></select></div>
+                    <div className="form-group"><label>Class / Year</label><select value={identityYear} onChange={(e) => setIdentityYear(e.target.value)}>{CLASS_YEAR_OPTIONS.map(year => <option key={year} value={year}>{year}</option>)}</select></div>
+                  </div>
+                  <p className="identity-help">The system creates the TTU email as indexnumber@ttu.edu.gh and sends an activation code.</p>
+                </>
+              ) : (
+                <>
+                  <div className="form-row-2">
+                    <div className="form-group"><label>Lecturer ID</label><input value={identityStaffId} onChange={(e) => setIdentityStaffId(e.target.value)} placeholder="LEC-0492" required /></div>
+                    <div className="form-group"><label>Courses Taught</label><input value={identityCourses} onChange={(e) => setIdentityCourses(e.target.value)} placeholder="Course one, Course two" required /></div>
+                  </div>
+                  <p className="identity-help">The system creates the TTU email from the lecturer ID and sends an activation code.</p>
+                </>
+              )}
+              <button type="submit" className="btn btn-primary">Provision Identity and Send Code</button>
+              {identityStatus && <p className="admin-form-status">{identityStatus}</p>}
+              {identityError && <p className="identity-error">{identityError}</p>}
+            </form>
+            <div className="admin-data-list mt-2">
+              {users.map(user => (
+                <div key={user.id} className="admin-data-row">
+                  <div className="admin-row-info"><h4>{user.name}</h4><p>{user.email}</p><span className="row-meta">{user.role} | {user.studentId || user.staffId || 'No institutional ID'} {user.year ? `| ${user.certificate || 'BTech'} ${user.year}` : ''}</span></div>
+                  <span className={`badge ${user.isVerified === false ? 'badge-gold' : 'badge-success'}`}>{user.isVerified === false ? 'awaiting verification' : 'verified'}</span>
+                </div>
+              ))}
             </div>
           </div>
         )}

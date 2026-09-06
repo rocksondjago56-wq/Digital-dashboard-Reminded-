@@ -19,6 +19,9 @@ create table public.profiles (
   requested_role text check (requested_role in ('student', 'student_head', 'lecturer', 'admin')),
   requested_courses text[] not null default '{}',
   profile_picture_url text,
+  is_verified boolean not null default true,
+  verification_code_hash text,
+  verification_expires_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

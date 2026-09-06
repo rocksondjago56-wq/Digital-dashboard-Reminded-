@@ -94,7 +94,9 @@ export const api = {
         body: JSON.stringify(data)
       }),
 
-    me: () => request('/auth/me')
+    me: () => request('/auth/me'),
+    requestVerification: (identifier) => request('/auth/request-verification', { method: 'POST', body: JSON.stringify({ identifier }) }),
+    activateAccount: (identifier, code, password) => request('/auth/activate-account', { method: 'POST', body: JSON.stringify({ identifier, code, password }) })
   },
 
   // --- Deadlines ---
@@ -182,7 +184,8 @@ export const api = {
       request(`/users/${id}/profile-pic`, {
         method: 'PUT',
         body: JSON.stringify({ profilePic })
-      })
+      }),
+    provision: (identity) => request('/users/provision', { method: 'POST', body: JSON.stringify(identity) })
   },
 
   // --- Timetable ---
