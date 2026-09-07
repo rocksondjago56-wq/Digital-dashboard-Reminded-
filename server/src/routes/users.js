@@ -61,20 +61,34 @@ router.get('/', authenticate, async (req, res) => {
 
 router.post('/provision', authenticate, requireAdmin(), async (req, res) => {
   try {
-    const { name, role, indexNumber, staffId, email: suppliedEmail, year, certificate, courses, designation } = req.body;
+    const { name, role, indexNumber, staffId, email: suppliedEmail, phone, year, certificate, courses, designation } = req.body;
     if (!name || !['student', 'lecturer', 'admin'].includes(role)) {
       return res.status(400).json({ error: 'Name and a student, lecturer, or administrator role are required.' });
     }
 
     const identifier = role === 'student' ? indexNumber?.trim() : staffId?.trim();
-    if (!identifier) return res.status(400).json({ error: role === 'student' ? 'Student index number is required.' : 'Staff ID is required.' });
+    if (role === 'student' && !identifier) return res.status(400).json({ error: 'Student index number is required.' });
+    if (role !== 'student' && !identifier && !suppliedEmail?.trim()) return res.status(400).json({ error: 'Staff members need a staff ID or an email address.' });
     if (role === 'student' && (!year || !certificate)) return res.status(400).json({ error: 'Student year and certificate programme are required.' });
     if (role === 'admin' && !suppliedEmail?.trim()) return res.status(400).json({ error: 'Administrator email is required.' });
 
-    const generatedEmail = `${identifier.replace(/[^a-z0-9]/gi, '').toLowerCase()}@ttu.edu.gh`;
+    const generatedEmail = identifier ? `${identifier.replace(/[^a-z0-9]/gi, '').toLowerCase()}@ttu.edu.gh` : '';
     const email = suppliedEmail?.trim().toLowerCase() || generatedEmail;
-    const exists = await prisma.user.findFirst({ where: { OR: [{ email }, ...(role === 'student' ? [{ studentId: identifier }] : [{ staffId: identifier }])] } });
-    if (exists) return res.status(409).json({ error: 'An identity with this email or ID already exists.' });
+    const existing = await prisma.user.findFirst({ where: { OR: [{ email }, ...(role === 'student' ? [{ studentId: identifier }] : identifier ? [{ staffId: identifier }] : [])] } });
+    if (existing) {
+      if (role === 'student' || existing.role !== role) return res.status(409).json({ error: 'An identity with this email or ID already exists.' });
+      const updated = await prisma.user.update({
+        where: { id: existing.id },
+        data: {
+          name: name.trim(),
+          staffId: identifier || existing.staffId,
+          phone: phone?.trim() || existing.phone,
+          courses: role === 'lecturer' ? (Array.isArray(courses) ? courses : String(courses || '').split(',').map(course => course.trim()).filter(Boolean)) : existing.courses,
+          designation: role === 'lecturer' ? designation || existing.designation || 'Lecturer' : designation || existing.designation || 'Department Administrator'
+        }
+      });
+      return res.json({ success: true, user: { id: updated.id, name: updated.name, email: updated.email, role: updated.role, isVerified: updated.isVerified }, message: 'Existing staff identity updated.' });
+    }
 
     const code = String(crypto.randomInt(100000, 1000000));
     const user = await prisma.user.create({
@@ -85,9 +99,10 @@ router.post('/provision', authenticate, requireAdmin(), async (req, res) => {
         role,
         department: 'Graphic Design',
         studentId: role === 'student' ? identifier : null,
-        staffId: role === 'student' ? null : identifier,
+        staffId: role === 'student' ? null : identifier || null,
         year: role === 'student' ? year : null,
         certificate: role === 'student' ? certificate : null,
+        phone: phone?.trim() || null,
         courses: role === 'lecturer' ? (Array.isArray(courses) ? courses : String(courses || '').split(',').map(course => course.trim()).filter(Boolean)) : [],
         designation: role === 'lecturer' ? designation || 'Lecturer' : role === 'admin' ? designation || 'Department Administrator' : null,
         isVerified: false,

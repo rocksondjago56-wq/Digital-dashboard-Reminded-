@@ -86,11 +86,14 @@ export default function AdminDashboard() {
   const [identityCertificate, setIdentityCertificate] = useState('BTech');
   const [identityCourses, setIdentityCourses] = useState('');
   const [identityEmail, setIdentityEmail] = useState('');
+  const [identityPhone, setIdentityPhone] = useState('');
   const [identityDesignation, setIdentityDesignation] = useState('Department Administrator');
   const [identityStatus, setIdentityStatus] = useState('');
   const [identityError, setIdentityError] = useState('');
   const [bulkStudents, setBulkStudents] = useState([]);
   const [bulkFileName, setBulkFileName] = useState('');
+  const [bulkIdentityType, setBulkIdentityType] = useState('student');
+  const [bulkSkippedRows, setBulkSkippedRows] = useState(0);
   const [bulkProgress, setBulkProgress] = useState('');
   const [bulkError, setBulkError] = useState('');
 
@@ -98,7 +101,7 @@ export default function AdminDashboard() {
     e.preventDefault();
     setIdentityStatus('');
     setIdentityError('');
-    const result = await provisionIdentity({ name: identityName, role: identityRole, indexNumber: identityIndex, staffId: identityStaffId, email: identityEmail, designation: identityDesignation, year: identityYear, certificate: identityCertificate, courses: identityCourses });
+    const result = await provisionIdentity({ name: identityName, role: identityRole, indexNumber: identityIndex, staffId: identityStaffId, email: identityEmail, phone: identityPhone, designation: identityDesignation, year: identityYear, certificate: identityCertificate, courses: identityCourses });
     if (!result?.success) {
       setIdentityError(result?.message || 'Could not provision this identity.');
       return;
@@ -109,6 +112,7 @@ export default function AdminDashboard() {
     setIdentityStaffId('');
     setIdentityCourses('');
     setIdentityEmail('');
+    setIdentityPhone('');
   };
 
   const getCertificate = (programme) => {
@@ -123,7 +127,12 @@ export default function AdminDashboard() {
     return match ? `Year ${match[1]}` : 'Year 1';
   };
 
-  const handleStudentWorkbook = async (event) => {
+  const getPhone = (phone) => {
+    const digits = String(phone || '').replace(/\D/g, '');
+    return digits.length === 9 ? `0${digits}` : String(phone || '').trim();
+  };
+
+  const handleIdentityWorkbook = async (event) => {
     const file = event.target.files?.[0];
     setBulkError('');
     setBulkProgress('');
@@ -132,19 +141,29 @@ export default function AdminDashboard() {
       const workbook = XLSX.read(await file.arrayBuffer(), { type: 'array' });
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
-      const students = rows.map((row, position) => ({
-        row: position + 1,
-        name: String(row[0] || '').trim(),
-        indexNumber: String(row[1] || row[2] || '').trim(),
-        email: String(row[6] || '').trim(),
-        certificate: getCertificate(row[4]),
-        year: getYear(row[5])
-      })).filter(student => student.name && student.indexNumber);
-      if (!students.length) throw new Error('No valid student name and index number rows were found.');
-      setBulkStudents(students);
+      const staffWorkbook = rows.some(row => ['lecturer', 'department administrator', 'administrator'].includes(String(row[4] || '').trim().toLowerCase()));
+      let skipped = 0;
+      const identities = rows.map((row, position) => {
+        if (!staffWorkbook) {
+          const student = { row: position + 1, name: String(row[0] || '').trim(), indexNumber: String(row[1] || row[2] || '').trim(), email: String(row[6] || '').trim(), certificate: getCertificate(row[4]), year: getYear(row[5]), role: 'student' };
+          if (student.name && student.indexNumber) return student;
+        } else {
+          const roleText = String(row[4] || '').trim().toLowerCase();
+          const role = roleText.includes('administrator') ? 'admin' : roleText === 'lecturer' ? 'lecturer' : '';
+          const staff = { row: position + 1, name: String(row[0] || '').trim(), staffId: String(row[1] || '').trim(), email: String(row[2] || '').trim(), phone: getPhone(row[3]), role, courses: role === 'lecturer' ? String(row[5] || '').trim() : '', designation: role === 'admin' ? String(row[5] || '').trim() : 'Lecturer' };
+          if (staff.name && staff.role && staff.email) return staff;
+        }
+        skipped += 1;
+        return null;
+      }).filter(Boolean);
+      if (!identities.length) throw new Error(staffWorkbook ? 'No valid staff rows were found. Each lecturer or administrator needs a name and email address. Staff IDs can be added later.' : 'No valid student name and index number rows were found.');
+      setBulkStudents(identities);
       setBulkFileName(file.name);
+      setBulkIdentityType(staffWorkbook ? 'staff' : 'student');
+      setBulkSkippedRows(skipped);
     } catch (error) {
       setBulkStudents([]);
+      setBulkSkippedRows(0);
       setBulkError(error.message || 'This workbook could not be read.');
     }
   };
@@ -152,13 +171,14 @@ export default function AdminDashboard() {
   const handleBulkProvision = async () => {
     if (!bulkStudents.length) return;
     setBulkError('');
-    setBulkProgress(`Preparing ${bulkStudents.length} student identities...`);
-    const results = await provisionIdentities(bulkStudents.map(student => ({ ...student, role: 'student' })), (complete, total) => {
+    const identityLabel = bulkIdentityType === 'staff' ? 'staff' : 'student';
+    setBulkProgress(`Preparing ${bulkStudents.length} ${identityLabel} identities...`);
+    const results = await provisionIdentities(bulkStudents, (complete, total) => {
       setBulkProgress(`Provisioning ${complete} of ${total} students...`);
     });
     const successful = results.filter(result => result?.success).length;
     const failed = results.length - successful;
-    setBulkProgress(`${successful} student identities provisioned${failed ? `, ${failed} skipped or failed` : ''}.`);
+    setBulkProgress(`${successful} ${identityLabel} identities provisioned${failed ? `, ${failed} skipped or failed` : ''}.`);
   };
 
   // Submit handlers
@@ -1019,18 +1039,18 @@ export default function AdminDashboard() {
             <div className="tab-actions-row"><h3>Student and Lecturer Identity Provisioning</h3></div>
             <section className="bulk-import-panel">
               <div>
-                <h4>Bulk Import Student Workbook</h4>
-                <p>Upload the approved Excel list. This workbook format uses name, index number, TTU email, programme, and level to preload every student identity.</p>
+                <h4>Bulk Import Identity Workbook</h4>
+                <p>Upload an approved student list or lecturer and staff list. Student files use name, index number, TTU email, programme, and level. Staff files use name, staff ID, email, mobile number, role, and course or designation.</p>
               </div>
-              <input type="file" accept=".xlsx,.xls" onChange={handleStudentWorkbook} />
-              {bulkFileName && <p className="bulk-import-summary">{bulkFileName}: {bulkStudents.length} valid students ready to provision.</p>}
+              <input type="file" accept=".xlsx,.xls" onChange={handleIdentityWorkbook} />
+              {bulkFileName && <p className="bulk-import-summary">{bulkFileName}: {bulkStudents.length} valid {bulkIdentityType} identities ready to provision{bulkSkippedRows ? `; ${bulkSkippedRows} incomplete row${bulkSkippedRows === 1 ? '' : 's'} skipped.` : '.'}</p>}
               {bulkStudents.length > 0 && (
                 <>
                   <div className="bulk-import-preview">
-                    {bulkStudents.slice(0, 5).map(student => <span key={`${student.indexNumber}-${student.row}`}>{student.name} | {student.indexNumber} | {student.certificate} {student.year}</span>)}
-                    {bulkStudents.length > 5 && <span>Plus {bulkStudents.length - 5} more students</span>}
+                    {bulkStudents.slice(0, 5).map(identity => <span key={`${identity.indexNumber || identity.staffId}-${identity.row}`}>{identity.name} | {identity.indexNumber || identity.staffId} | {identity.role === 'student' ? `${identity.certificate} ${identity.year}` : `${identity.role} | ${identity.phone || 'No mobile number'}`}</span>)}
+                    {bulkStudents.length > 5 && <span>Plus {bulkStudents.length - 5} more {bulkIdentityType} identities</span>}
                   </div>
-                  <button type="button" className="btn btn-accent" onClick={handleBulkProvision}>Provision All {bulkStudents.length} Students</button>
+                  <button type="button" className="btn btn-accent" onClick={handleBulkProvision}>Provision All {bulkStudents.length} {bulkIdentityType === 'staff' ? 'Staff' : 'Students'}</button>
                 </>
               )}
               {bulkProgress && <p className="admin-form-status">{bulkProgress}</p>}
@@ -1061,19 +1081,21 @@ export default function AdminDashboard() {
               ) : identityRole === 'lecturer' ? (
                 <>
                   <div className="form-row-2">
-                    <div className="form-group"><label>Lecturer ID</label><input value={identityStaffId} onChange={(e) => setIdentityStaffId(e.target.value)} placeholder="LEC-0492" required /></div>
+                    <div className="form-group"><label>Lecturer ID (Add When Available)</label><input value={identityStaffId} onChange={(e) => setIdentityStaffId(e.target.value)} placeholder="LEC-0492" /></div>
                     <div className="form-group"><label>Courses Taught</label><input value={identityCourses} onChange={(e) => setIdentityCourses(e.target.value)} placeholder="Course one, Course two" required /></div>
                   </div>
-                  <p className="identity-help">The system creates the TTU email from the lecturer ID and sends an activation code.</p>
+                  <div className="form-group"><label>Registered Mobile Number</label><input type="tel" value={identityPhone} onChange={(e) => setIdentityPhone(e.target.value)} placeholder="0506471139 or +233506471139" /></div>
+                  <p className="identity-help">A lecturer can be provisioned with email and mobile number while the staff ID is pending. Re-entering the lecturer later with an ID updates the same identity.</p>
                 </>
               ) : (
                 <>
                   <div className="form-row-2">
-                    <div className="form-group"><label>Administrator Staff ID</label><input value={identityStaffId} onChange={(e) => setIdentityStaffId(e.target.value)} placeholder="ADM-1001" required /></div>
+                    <div className="form-group"><label>Administrator Staff ID (Add When Available)</label><input value={identityStaffId} onChange={(e) => setIdentityStaffId(e.target.value)} placeholder="ADM-1001" /></div>
                     <div className="form-group"><label>School Email for Verification</label><input type="email" value={identityEmail} onChange={(e) => setIdentityEmail(e.target.value)} placeholder="name@ttu.edu.gh" required /></div>
                   </div>
+                  <div className="form-group"><label>Registered Mobile Number</label><input type="tel" value={identityPhone} onChange={(e) => setIdentityPhone(e.target.value)} placeholder="0506471139 or +233506471139" /></div>
                   <div className="form-group"><label>Administrative Designation</label><input value={identityDesignation} onChange={(e) => setIdentityDesignation(e.target.value)} placeholder="Department Administrator" required /></div>
-                  <p className="identity-help">The verification code is sent to the administrator email entered here. Activation then automatically grants administrator access.</p>
+                  <p className="identity-help">The verification code is sent to the administrator email entered here. A mobile number is saved for later sign-in, while a staff ID can be added by re-importing the record.</p>
                 </>
               )}
               <button type="submit" className="btn btn-primary">Provision Identity and Send Code</button>

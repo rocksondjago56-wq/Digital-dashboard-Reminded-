@@ -1033,18 +1033,26 @@ export const DbProvider = ({ children }) => {
       }
     }
     const identifier = identity.role === 'student' ? identity.indexNumber?.trim() : identity.staffId?.trim();
-    if (!identifier) return { success: false, message: 'An index number or lecturer ID is required.' };
+    if (identity.role === 'student' && !identifier) return { success: false, message: 'A student index number is required.' };
+    if (identity.role !== 'student' && !identifier && !identity.email?.trim()) return { success: false, message: 'Staff members need a staff ID or an email address.' };
     if (identity.role === 'admin' && !identity.email?.trim()) return { success: false, message: 'Administrator email is required.' };
     const email = identity.email?.trim().toLowerCase() || `${identifier.replace(/[^a-z0-9]/gi, '').toLowerCase()}@ttu.edu.gh`;
     const existingUsers = getSavedUsers() || users;
-    if (existingUsers.some(user => user.email === email || user.studentId === identifier || user.staffId === identifier)) return { success: false, message: 'An identity with this email or ID already exists.' };
+    const existingUser = existingUsers.find(user => user.email === email || (identifier && (user.studentId === identifier || user.staffId === identifier)));
+    if (existingUser) {
+      if (identity.role === 'student' || existingUser.role !== identity.role) return { success: false, message: 'An identity with this email or ID already exists.' };
+      const updatedUser = { ...existingUser, name: identity.name.trim(), staffId: identifier || existingUser.staffId, phone: identity.phone?.trim() || existingUser.phone, courses: identity.role === 'lecturer' ? parseCourses(identity.courses) : existingUser.courses, designation: identity.designation || existingUser.designation };
+      syncUsers(existingUsers.map(user => user.id === existingUser.id ? updatedUser : user));
+      return { success: true, user: updatedUser, message: 'Existing staff identity updated.' };
+    }
     const code = String(Math.floor(100000 + Math.random() * 900000));
     const user = {
       id: `u_${Date.now()}`,
       name: identity.name.trim(), email, role: identity.role, department: 'Graphic Design', isVerified: false, verificationCode: code,
       studentId: identity.role === 'student' ? identifier : undefined,
       indexNumber: identity.role === 'student' ? identifier : undefined,
-      staffId: identity.role === 'student' ? undefined : identifier,
+      staffId: identity.role === 'student' ? undefined : identifier || undefined,
+      phone: identity.phone?.trim() || undefined,
       year: identity.role === 'student' ? identity.year : undefined,
       certificate: identity.role === 'student' ? identity.certificate : undefined,
       courses: identity.role === 'lecturer' ? parseCourses(identity.courses) : [],

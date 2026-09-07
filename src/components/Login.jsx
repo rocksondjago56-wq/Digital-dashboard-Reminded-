@@ -228,13 +228,13 @@ export default function Login() {
                 <input id="activationIdentifier" value={activationIdentifier} onChange={(e) => setActivationIdentifier(e.target.value)} placeholder="e.g. 0241234567, 0420210088, or LEC-0492" required />
               </div>
               {!codeRequested ? (
-                <button type="button" className="btn btn-primary w-full mt-2" disabled={isSubmitting} onClick={handleRequestVerification}>Send Mobile / Email Verification Code</button>
+                <button type="button" className="btn btn-primary w-full mt-2" disabled={isSubmitting} onClick={handleRequestVerification}>Send Email Verification Code</button>
               ) : (
                 <>
                   <div className="form-group"><label htmlFor="activationCode">Verification Code</label><input id="activationCode" value={activationCode} onChange={(e) => setActivationCode(e.target.value)} placeholder="6-digit verification code" required /></div>
                   <div className="form-group"><label htmlFor="activationPassword">Create / Change Password</label><input id="activationPassword" type="password" value={activationPassword} onChange={(e) => setActivationPassword(e.target.value)} placeholder="At least 6 characters" required /></div>
                   {developmentCode && <p className="development-code">Development verification code: {developmentCode}</p>}
-                  <button type="submit" className="btn btn-accent w-full mt-2" disabled={isSubmitting}>{isSubmitting ? 'Verifying...' : 'Verify Mobile Code & Set Password'}</button>
+                  <button type="submit" className="btn btn-accent w-full mt-2" disabled={isSubmitting}>{isSubmitting ? 'Verifying...' : 'Verify Code & Set Password'}</button>
                 </>
               )}
             </form>

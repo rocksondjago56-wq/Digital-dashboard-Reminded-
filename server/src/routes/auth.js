@@ -133,7 +133,7 @@ router.post('/signup', async (req, res) => {
       developmentCode: devCode,
       message: isVerified
         ? 'Account created successfully!'
-        : `Staff account created! A 6-digit verification code was sent to ${formattedPhone || user.email}. Enter it to activate and confirm your password.`
+        : `Staff account created! A 6-digit verification code was sent to ${user.email}. The registered mobile number can also be used to identify the account.`
     });
   } catch (error) {
     console.error('Signup error:', error);
@@ -174,7 +174,7 @@ router.post('/request-verification', async (req, res) => {
     });
 
     const delivery = await sendVerificationEmail({ to: user.email, name: user.name, code });
-    const targetDesc = user.phone ? `mobile number (${user.phone}) and TTU email (${user.email})` : `TTU email (${user.email})`;
+    const targetDesc = user.phone ? `TTU email (${user.email}). The registered mobile number (${user.phone}) can also be used to find this account` : `TTU email (${user.email})`;
     res.json({
       success: true,
       message: `A 6-digit verification code has been generated for your ${targetDesc}.`,
