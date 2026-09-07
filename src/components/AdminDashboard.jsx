@@ -1,4 +1,5 @@
 import React, { useContext, useState } from 'react';
+import * as XLSX from 'xlsx';
 import { DbContext } from '../context/DbContextDefinition';
 import './AdminDashboard.css';
 import {
@@ -33,6 +34,7 @@ export default function AdminDashboard() {
     deleteClassWhatsAppGroup,
     updateUserRole,
     provisionIdentity,
+    provisionIdentities,
     deleteUser
   } = useContext(DbContext);
 
@@ -87,6 +89,10 @@ export default function AdminDashboard() {
   const [identityDesignation, setIdentityDesignation] = useState('Department Administrator');
   const [identityStatus, setIdentityStatus] = useState('');
   const [identityError, setIdentityError] = useState('');
+  const [bulkStudents, setBulkStudents] = useState([]);
+  const [bulkFileName, setBulkFileName] = useState('');
+  const [bulkProgress, setBulkProgress] = useState('');
+  const [bulkError, setBulkError] = useState('');
 
   const handleProvisionIdentity = async (e) => {
     e.preventDefault();
@@ -103,6 +109,56 @@ export default function AdminDashboard() {
     setIdentityStaffId('');
     setIdentityCourses('');
     setIdentityEmail('');
+  };
+
+  const getCertificate = (programme) => {
+    const value = String(programme || '').toLowerCase();
+    if (value.includes('hnd')) return 'HND';
+    if (value.includes('diploma')) return 'Diploma';
+    return 'BTech';
+  };
+
+  const getYear = (level) => {
+    const match = String(level || '').match(/([1-4])00/);
+    return match ? `Year ${match[1]}` : 'Year 1';
+  };
+
+  const handleStudentWorkbook = async (event) => {
+    const file = event.target.files?.[0];
+    setBulkError('');
+    setBulkProgress('');
+    if (!file) return;
+    try {
+      const workbook = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+      const students = rows.map((row, position) => ({
+        row: position + 1,
+        name: String(row[0] || '').trim(),
+        indexNumber: String(row[1] || row[2] || '').trim(),
+        email: String(row[6] || '').trim(),
+        certificate: getCertificate(row[4]),
+        year: getYear(row[5])
+      })).filter(student => student.name && student.indexNumber);
+      if (!students.length) throw new Error('No valid student name and index number rows were found.');
+      setBulkStudents(students);
+      setBulkFileName(file.name);
+    } catch (error) {
+      setBulkStudents([]);
+      setBulkError(error.message || 'This workbook could not be read.');
+    }
+  };
+
+  const handleBulkProvision = async () => {
+    if (!bulkStudents.length) return;
+    setBulkError('');
+    setBulkProgress(`Preparing ${bulkStudents.length} student identities...`);
+    const results = await provisionIdentities(bulkStudents.map(student => ({ ...student, role: 'student' })), (complete, total) => {
+      setBulkProgress(`Provisioning ${complete} of ${total} students...`);
+    });
+    const successful = results.filter(result => result?.success).length;
+    const failed = results.length - successful;
+    setBulkProgress(`${successful} student identities provisioned${failed ? `, ${failed} skipped or failed` : ''}.`);
   };
 
   // Submit handlers
@@ -961,6 +1017,25 @@ export default function AdminDashboard() {
         {adminTab === 'identities' && (
           <div>
             <div className="tab-actions-row"><h3>Student and Lecturer Identity Provisioning</h3></div>
+            <section className="bulk-import-panel">
+              <div>
+                <h4>Bulk Import Student Workbook</h4>
+                <p>Upload the approved Excel list. This workbook format uses name, index number, TTU email, programme, and level to preload every student identity.</p>
+              </div>
+              <input type="file" accept=".xlsx,.xls" onChange={handleStudentWorkbook} />
+              {bulkFileName && <p className="bulk-import-summary">{bulkFileName}: {bulkStudents.length} valid students ready to provision.</p>}
+              {bulkStudents.length > 0 && (
+                <>
+                  <div className="bulk-import-preview">
+                    {bulkStudents.slice(0, 5).map(student => <span key={`${student.indexNumber}-${student.row}`}>{student.name} | {student.indexNumber} | {student.certificate} {student.year}</span>)}
+                    {bulkStudents.length > 5 && <span>Plus {bulkStudents.length - 5} more students</span>}
+                  </div>
+                  <button type="button" className="btn btn-accent" onClick={handleBulkProvision}>Provision All {bulkStudents.length} Students</button>
+                </>
+              )}
+              {bulkProgress && <p className="admin-form-status">{bulkProgress}</p>}
+              {bulkError && <p className="identity-error">{bulkError}</p>}
+            </section>
             <form onSubmit={handleProvisionIdentity} className="admin-action-form identity-form">
               <div className="form-row-2">
                 <div className="form-group">

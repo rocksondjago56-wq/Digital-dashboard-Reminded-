@@ -69,9 +69,8 @@ router.post('/provision', authenticate, requireAdmin(), async (req, res) => {
     if (role === 'student' && (!year || !certificate)) return res.status(400).json({ error: 'Student year and certificate programme are required.' });
     if (role === 'admin' && !suppliedEmail?.trim()) return res.status(400).json({ error: 'Administrator email is required.' });
 
-    const email = role === 'admin'
-      ? suppliedEmail.trim().toLowerCase()
-      : `${identifier.replace(/[^a-z0-9]/gi, '').toLowerCase()}@ttu.edu.gh`;
+    const generatedEmail = `${identifier.replace(/[^a-z0-9]/gi, '').toLowerCase()}@ttu.edu.gh`;
+    const email = suppliedEmail?.trim().toLowerCase() || generatedEmail;
     const exists = await prisma.user.findFirst({ where: { OR: [{ email }, ...(role === 'student' ? [{ studentId: identifier }] : [{ staffId: identifier }])] } });
     if (exists) return res.status(409).json({ error: 'An identity with this email or ID already exists.' });
 

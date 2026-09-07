@@ -1003,11 +1003,11 @@ export const DbProvider = ({ children }) => {
     addNotification(`User role updated for user ID: ${userId} to ${newRole}.`);
   };
 
-  const provisionIdentity = async (identity) => {
+  const provisionIdentity = async (identity, shouldRefresh = true) => {
     if (useApi) {
       try {
         const result = await api.users.provision(identity);
-        if (result.success) await refreshRemoteData();
+        if (result.success && shouldRefresh) await refreshRemoteData();
         return result;
       } catch (error) {
         return { success: false, message: error.message };
@@ -1016,10 +1016,9 @@ export const DbProvider = ({ children }) => {
     const identifier = identity.role === 'student' ? identity.indexNumber?.trim() : identity.staffId?.trim();
     if (!identifier) return { success: false, message: 'An index number or lecturer ID is required.' };
     if (identity.role === 'admin' && !identity.email?.trim()) return { success: false, message: 'Administrator email is required.' };
-    const email = identity.role === 'admin'
-      ? identity.email.trim().toLowerCase()
-      : `${identifier.replace(/[^a-z0-9]/gi, '').toLowerCase()}@ttu.edu.gh`;
-    if (users.some(user => user.email === email || user.studentId === identifier || user.staffId === identifier)) return { success: false, message: 'An identity with this email or ID already exists.' };
+    const email = identity.email?.trim().toLowerCase() || `${identifier.replace(/[^a-z0-9]/gi, '').toLowerCase()}@ttu.edu.gh`;
+    const existingUsers = getSavedUsers() || users;
+    if (existingUsers.some(user => user.email === email || user.studentId === identifier || user.staffId === identifier)) return { success: false, message: 'An identity with this email or ID already exists.' };
     const code = String(Math.floor(100000 + Math.random() * 900000));
     const user = {
       id: `u_${Date.now()}`,
@@ -1032,8 +1031,21 @@ export const DbProvider = ({ children }) => {
       courses: identity.role === 'lecturer' ? parseCourses(identity.courses) : [],
       designation: identity.role === 'admin' ? identity.designation || 'Department Administrator' : undefined
     };
-    syncUsers([...users, user]);
+    syncUsers([...existingUsers, user]);
     return { success: true, user, message: 'Identity provisioned.', developmentCode: code };
+  };
+
+  const provisionIdentities = async (identities, onProgress) => {
+    const results = [];
+    const batchSize = 10;
+    for (let start = 0; start < identities.length; start += batchSize) {
+      const batch = identities.slice(start, start + batchSize);
+      const batchResults = await Promise.all(batch.map(identity => provisionIdentity(identity, false)));
+      results.push(...batchResults);
+      onProgress?.(Math.min(start + batch.length, identities.length), identities.length);
+    }
+    if (useApi && results.some(result => result?.success)) await refreshRemoteData();
+    return results;
   };
 
   const updateUserProfilePic = async (userId, newProfilePic) => {
@@ -1143,6 +1155,7 @@ export const DbProvider = ({ children }) => {
       deleteClassWhatsAppGroup,
       updateUserRole,
       provisionIdentity,
+      provisionIdentities,
       updateUserProfilePic,
       deleteUser,
       markAllNotificationsAsRead
