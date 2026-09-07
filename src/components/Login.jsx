@@ -224,7 +224,7 @@ export default function Login() {
           <>
             <form onSubmit={handleActivateAccount} className="login-form">
               <div className="form-group">
-                <label htmlFor="activationIdentifier">TTU Email, Staff Mobile Number, Index Number, or Lecturer ID</label>
+                <label htmlFor="activationIdentifier">TTU Email, Registered Staff Mobile Number, Index Number, or Lecturer ID</label>
                 <input id="activationIdentifier" value={activationIdentifier} onChange={(e) => setActivationIdentifier(e.target.value)} placeholder="e.g. 0241234567, 0420210088, or LEC-0492" required />
               </div>
               {!codeRequested ? (
@@ -238,6 +238,9 @@ export default function Login() {
                 </>
               )}
             </form>
+            {error.includes('No account or preloaded identity') && (
+              <div className="switch-mode-text mt-3"><p><span onClick={() => { setIsActivating(false); setIsSignUp(true); setError(''); }} className="switch-mode-link">Create a new account</span></p></div>
+            )}
             <div className="switch-mode-text mt-3"><p><span onClick={() => setIsActivating(false)} className="switch-mode-link">Back to Sign In</span></p></div>
           </>
         ) : !isSignUp ? (

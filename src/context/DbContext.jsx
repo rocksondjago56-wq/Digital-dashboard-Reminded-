@@ -484,6 +484,17 @@ export const DbProvider = ({ children }) => {
 
   // ─── Auth Operations ──────────────────────────────────────────────────
 
+  const matchesPhone = (phone, identifier) => {
+    if (!phone) return false;
+    const inputDigits = String(identifier || '').replace(/\D/g, '');
+    const phoneDigits = String(phone).replace(/\D/g, '');
+    if (inputDigits.length < 7) return false;
+    const alternatives = new Set([inputDigits]);
+    if (inputDigits.startsWith('0') && inputDigits.length === 10) alternatives.add(`233${inputDigits.slice(1)}`);
+    if (inputDigits.startsWith('233') && inputDigits.length === 12) alternatives.add(`0${inputDigits.slice(3)}`);
+    return [...alternatives].some(value => phoneDigits.includes(value));
+  };
+
   const login = async (identifier, password) => {
     // API Mode
     if (useApi) {
@@ -507,14 +518,13 @@ export const DbProvider = ({ children }) => {
     const savedUsers = getSavedUsers();
     const accountRecords = savedUsers || users;
 
-    const cleanTerm = term.replace(/[^0-9]/g, '');
     const user = accountRecords.find(u =>
       u.email?.toLowerCase() === term ||
       u.name?.toLowerCase() === term ||
       (u.studentId && u.studentId.toLowerCase() === term) ||
       (u.indexNumber && u.indexNumber.toLowerCase() === term) ||
       (u.staffId && u.staffId.toLowerCase() === term) ||
-      (u.phone && (u.phone.toLowerCase() === term || (cleanTerm.length >= 7 && u.phone.includes(cleanTerm))))
+      matchesPhone(u.phone, term)
     );
 
     if (user) {
@@ -604,8 +614,9 @@ export const DbProvider = ({ children }) => {
       }
     }
     const term = identifier.trim().toLowerCase();
-    const cleanDigits = term.replace(/[^0-9]/g, '');
-    const user = (getSavedUsers() || users).find(item => [item.email, item.studentId, item.staffId, item.phone].filter(Boolean).some(value => value.toLowerCase() === term || (cleanDigits.length >= 7 && value.includes(cleanDigits))));
+    const user = (getSavedUsers() || users).find(item =>
+      [item.email, item.studentId, item.staffId].filter(Boolean).some(value => value.toLowerCase() === term) || matchesPhone(item.phone, term)
+    );
     if (!user) return { success: false, message: 'No account or preloaded identity was found.' };
     const code = String(Math.floor(100000 + Math.random() * 900000));
     const updated = users.map(item => item.id === user.id ? { ...item, verificationCode: code, isVerified: false } : item);
@@ -622,8 +633,9 @@ export const DbProvider = ({ children }) => {
       }
     }
     const term = identifier.trim().toLowerCase();
-    const cleanDigits = term.replace(/[^0-9]/g, '');
-    const user = users.find(item => [item.email, item.studentId, item.staffId, item.phone].filter(Boolean).some(value => value.toLowerCase() === term || (cleanDigits.length >= 7 && value.includes(cleanDigits))));
+    const user = users.find(item =>
+      [item.email, item.studentId, item.staffId].filter(Boolean).some(value => value.toLowerCase() === term) || matchesPhone(item.phone, term)
+    );
     if (!user || user.verificationCode !== code) return { success: false, message: 'The verification code is incorrect.' };
     const updatedUsers = users.map(item => item.id === user.id ? { ...item, password, isVerified: true, verificationCode: undefined } : item);
     syncUsers(updatedUsers);

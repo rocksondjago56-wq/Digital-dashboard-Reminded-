@@ -8,6 +8,16 @@ import { sendVerificationEmail } from '../services/email.js';
 const router = Router();
 const prisma = new PrismaClient();
 
+const getPhoneLookupTerms = (value) => {
+  const digits = String(value || '').replace(/\D/g, '');
+  if (digits.length < 7) return [];
+
+  const terms = new Set([digits]);
+  if (digits.startsWith('0') && digits.length === 10) terms.add(`233${digits.slice(1)}`);
+  if (digits.startsWith('233') && digits.length === 12) terms.add(`0${digits.slice(3)}`);
+  return [...terms];
+};
+
 /**
  * Generate a JWT token for a user.
  */
@@ -63,8 +73,11 @@ router.post('/signup', async (req, res) => {
 
     // Check if phone already exists if provided
     const formattedPhone = phone ? phone.trim() : null;
+    const phoneTerms = getPhoneLookupTerms(formattedPhone);
     if (formattedPhone) {
-      const existingPhone = await prisma.user.findFirst({ where: { phone: formattedPhone } });
+      const existingPhone = await prisma.user.findFirst({
+        where: { OR: phoneTerms.map(value => ({ phone: { contains: value } })) }
+      });
       if (existingPhone) {
         return res.status(409).json({ error: 'This mobile number is already registered to an account.' });
       }
@@ -130,7 +143,7 @@ router.post('/signup', async (req, res) => {
 
 const findIdentity = (identifier) => {
   const term = identifier.trim().toLowerCase();
-  const cleanDigits = term.replace(/[^0-9]/g, '');
+  const phoneTerms = getPhoneLookupTerms(term);
 
   return prisma.user.findFirst({
     where: {
@@ -139,7 +152,7 @@ const findIdentity = (identifier) => {
         { studentId: { equals: term, mode: 'insensitive' } },
         { staffId: { equals: term, mode: 'insensitive' } },
         { phone: { equals: term, mode: 'insensitive' } },
-        ...(cleanDigits.length >= 7 ? [{ phone: { contains: cleanDigits } }] : [])
+        ...phoneTerms.map(value => ({ phone: { contains: value } }))
       ]
     }
   });
