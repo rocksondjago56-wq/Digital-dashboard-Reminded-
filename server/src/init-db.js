@@ -35,6 +35,7 @@ async function initDatabase() {
       "certificate" TEXT,
       "student_id" TEXT UNIQUE,
       "staff_id" TEXT UNIQUE,
+      "phone" TEXT UNIQUE,
       "designation" TEXT,
       "courses" TEXT[] NOT NULL DEFAULT '{}',
       "profile_picture_url" TEXT,
@@ -119,7 +120,8 @@ async function initDatabase() {
     `ALTER TABLE "announcements" ADD COLUMN IF NOT EXISTS "year" TEXT NOT NULL DEFAULT 'All Years';`,
     `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "is_verified" BOOLEAN NOT NULL DEFAULT true;`,
     `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "verification_code_hash" TEXT;`,
-    `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "verification_expires_at" TIMESTAMPTZ;`
+    `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "verification_expires_at" TIMESTAMPTZ;`,
+    `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "phone" TEXT UNIQUE;`
   ];
 
   try {

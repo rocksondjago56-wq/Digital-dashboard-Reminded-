@@ -39,6 +39,7 @@ model User {
   certificate       String?
   studentId         String?   @unique @map("student_id")
   staffId           String?   @unique @map("staff_id")
+  phone             String?   @unique @map("phone")
   designation       String?
   courses           String[]  @default([])
   profilePictureUrl String?   @map("profile_picture_url")

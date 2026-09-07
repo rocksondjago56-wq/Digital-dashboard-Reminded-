@@ -28,6 +28,8 @@ export default function Login() {
   const [regEmail, setRegEmail] = useState('');
   const [regPassword, setRegPassword] = useState('');
   const [regRole, setRegRole] = useState('student');
+  const [regPhone, setRegPhone] = useState('');
+  const [verifyViaMobile, setVerifyViaMobile] = useState(true);
 
   // Student extra fields
   const [regYear, setRegYear] = useState('Year 1');
@@ -75,12 +77,21 @@ export default function Login() {
       return;
     }
 
+    if ((regRole === 'lecturer' || regRole === 'admin') && !regPhone.trim()) {
+      setError('Mobile phone number is required for staff account registration.');
+      return;
+    }
+
     if (regPassword.length < 6) {
       setError('Password must be at least 6 characters.');
       return;
     }
 
-    const extraFields = {};
+    const extraFields = {
+      phone: regPhone.trim(),
+      verifyViaMobile: (regRole === 'lecturer' || regRole === 'admin') ? verifyViaMobile : false
+    };
+
     if (regRole === 'student') {
       extraFields.year = regYear;
       extraFields.certificate = regCertificate;
@@ -99,6 +110,13 @@ export default function Login() {
       const result = await signUp(regName, regEmail, regPassword, regRole, extraFields);
       if (!result.success) {
         setError(result.message);
+      } else if (result.requiresVerification) {
+        setSuccessMsg(result.message);
+        setActivationIdentifier(regPhone.trim() || regEmail.trim());
+        setDevelopmentCode(result.developmentCode || '');
+        setCodeRequested(true);
+        setIsSignUp(false);
+        setIsActivating(true);
       } else if (result.message) {
         setSuccessMsg(result.message);
       }
@@ -126,7 +144,7 @@ export default function Login() {
     setError('');
     setSuccessMsg('');
     if (!activationIdentifier.trim()) {
-      setError('Enter your TTU email, index number, or lecturer ID.');
+      setError('Enter your TTU email, mobile number, index number, or staff ID.');
       return;
     }
     setIsSubmitting(true);
@@ -206,17 +224,17 @@ export default function Login() {
           <>
             <form onSubmit={handleActivateAccount} className="login-form">
               <div className="form-group">
-                <label htmlFor="activationIdentifier">TTU Email, Index Number, or Lecturer ID</label>
-                <input id="activationIdentifier" value={activationIdentifier} onChange={(e) => setActivationIdentifier(e.target.value)} placeholder="0420210088 or LEC-0492" required />
+                <label htmlFor="activationIdentifier">TTU Email, Staff Mobile Number, Index Number, or Lecturer ID</label>
+                <input id="activationIdentifier" value={activationIdentifier} onChange={(e) => setActivationIdentifier(e.target.value)} placeholder="e.g. 0241234567, 0420210088, or LEC-0492" required />
               </div>
               {!codeRequested ? (
-                <button type="button" className="btn btn-primary w-full mt-2" disabled={isSubmitting} onClick={handleRequestVerification}>Send Verification Code</button>
+                <button type="button" className="btn btn-primary w-full mt-2" disabled={isSubmitting} onClick={handleRequestVerification}>Send Mobile / Email Verification Code</button>
               ) : (
                 <>
-                  <div className="form-group"><label htmlFor="activationCode">Verification Code</label><input id="activationCode" value={activationCode} onChange={(e) => setActivationCode(e.target.value)} placeholder="6-digit code" required /></div>
-                  <div className="form-group"><label htmlFor="activationPassword">Create Password</label><input id="activationPassword" type="password" value={activationPassword} onChange={(e) => setActivationPassword(e.target.value)} placeholder="At least 6 characters" required /></div>
+                  <div className="form-group"><label htmlFor="activationCode">Verification Code</label><input id="activationCode" value={activationCode} onChange={(e) => setActivationCode(e.target.value)} placeholder="6-digit verification code" required /></div>
+                  <div className="form-group"><label htmlFor="activationPassword">Create / Change Password</label><input id="activationPassword" type="password" value={activationPassword} onChange={(e) => setActivationPassword(e.target.value)} placeholder="At least 6 characters" required /></div>
                   {developmentCode && <p className="development-code">Development verification code: {developmentCode}</p>}
-                  <button type="submit" className="btn btn-accent w-full mt-2" disabled={isSubmitting}>{isSubmitting ? 'Verifying...' : 'Verify and Set Password'}</button>
+                  <button type="submit" className="btn btn-accent w-full mt-2" disabled={isSubmitting}>{isSubmitting ? 'Verifying...' : 'Verify Mobile Code & Set Password'}</button>
                 </>
               )}
             </form>
@@ -226,11 +244,11 @@ export default function Login() {
           <>
             <form onSubmit={handleSignIn} className="login-form">
               <div className="form-group">
-                <label htmlFor="email">Email, Full Name, Index Number, or Staff ID</label>
+                <label htmlFor="email">Email, Mobile Number, Full Name, Index Number, or Staff ID</label>
                 <input
                   type="text"
                   id="email"
-                  placeholder="e.g. Ceasar Djago, student@ttu.edu.gh, or 0420210088"
+                  placeholder="e.g. 0241234567, Ceasar Djago, or student@ttu.edu.gh"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -255,7 +273,7 @@ export default function Login() {
             </form>
 
             <div className="switch-mode-text mt-3">
-              <p><span onClick={openActivation} className="switch-mode-link">Activate your preloaded TTU account</span></p>
+              <p><span onClick={openActivation} className="switch-mode-link">Activate or Verify Staff Mobile / Preloaded Account</span></p>
             </div>
           </>
         ) : (
@@ -312,6 +330,34 @@ export default function Login() {
                   <option value="admin">Department Administrator</option>
                 </select>
               </div>
+
+              {/* MOBILE PHONE NUMBER FIELD */}
+              <div className="form-group">
+                <label htmlFor="regPhone">
+                  Mobile Phone Number {(regRole === 'lecturer' || regRole === 'admin') ? '(Required for Mobile Verification)' : '(Optional)'}
+                </label>
+                <input
+                  type="tel"
+                  id="regPhone"
+                  placeholder="e.g. 0241234567 or +233241234567"
+                  value={regPhone}
+                  onChange={(e) => setRegPhone(e.target.value)}
+                  required={regRole === 'lecturer' || regRole === 'admin'}
+                />
+              </div>
+
+              {(regRole === 'lecturer' || regRole === 'admin') && (
+                <div className="form-group" style={{ marginTop: '-4px', marginBottom: '16px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 500, fontSize: '0.85rem', color: '#475569' }}>
+                    <input
+                      type="checkbox"
+                      checked={verifyViaMobile}
+                      onChange={(e) => setVerifyViaMobile(e.target.checked)}
+                    />
+                    <span>Verify with mobile code to set/confirm password</span>
+                  </label>
+                </div>
+              )}
 
               {/* STUDENT ROLE FIELDS */}
               {regRole === 'student' && (

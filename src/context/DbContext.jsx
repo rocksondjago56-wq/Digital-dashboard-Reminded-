@@ -507,12 +507,14 @@ export const DbProvider = ({ children }) => {
     const savedUsers = getSavedUsers();
     const accountRecords = savedUsers || users;
 
+    const cleanTerm = term.replace(/[^0-9]/g, '');
     const user = accountRecords.find(u =>
       u.email?.toLowerCase() === term ||
       u.name?.toLowerCase() === term ||
       (u.studentId && u.studentId.toLowerCase() === term) ||
       (u.indexNumber && u.indexNumber.toLowerCase() === term) ||
-      (u.staffId && u.staffId.toLowerCase() === term)
+      (u.staffId && u.staffId.toLowerCase() === term) ||
+      (u.phone && (u.phone.toLowerCase() === term || (cleanTerm.length >= 7 && u.phone.includes(cleanTerm))))
     );
 
     if (user) {
@@ -531,7 +533,7 @@ export const DbProvider = ({ children }) => {
       return { success: false, message: 'Incorrect password.' };
     }
 
-    return { success: false, message: 'Account not found. Use your email, full name, index number, or staff ID.' };
+    return { success: false, message: 'Account not found. Use your email, mobile number, full name, index number, or staff ID.' };
   };
 
   const signUp = async (name, email, password, role = 'student', extraFields = {}) => {
@@ -547,10 +549,12 @@ export const DbProvider = ({ children }) => {
         });
 
         if (result.success) {
-          setToken(result.token);
-          setCurrentUser(result.user);
-          addNotification(`New user registered: ${result.user.name} (${result.user.role})`);
-          return { success: true, user: result.user, message: result.message };
+          if (result.user && !result.requiresVerification) {
+            setToken(result.token);
+            setCurrentUser(result.user);
+          }
+          addNotification(`New user registered: ${result.user?.name || name} (${role})`);
+          return { success: true, user: result.user, message: result.message, developmentCode: result.developmentCode, requiresVerification: result.requiresVerification };
         }
         return { success: false, message: result.error || 'Signup failed.' };
       } catch (error) {
@@ -599,12 +603,14 @@ export const DbProvider = ({ children }) => {
         return { success: false, message: error.message };
       }
     }
-    const user = (getSavedUsers() || users).find(item => [item.email, item.studentId, item.staffId].filter(Boolean).some(value => value.toLowerCase() === identifier.trim().toLowerCase()));
-    if (!user) return { success: false, message: 'No preloaded department identity was found.' };
+    const term = identifier.trim().toLowerCase();
+    const cleanDigits = term.replace(/[^0-9]/g, '');
+    const user = (getSavedUsers() || users).find(item => [item.email, item.studentId, item.staffId, item.phone].filter(Boolean).some(value => value.toLowerCase() === term || (cleanDigits.length >= 7 && value.includes(cleanDigits))));
+    if (!user) return { success: false, message: 'No account or preloaded identity was found.' };
     const code = String(Math.floor(100000 + Math.random() * 900000));
     const updated = users.map(item => item.id === user.id ? { ...item, verificationCode: code, isVerified: false } : item);
     syncUsers(updated);
-    return { success: true, message: 'Verification code created for this preloaded identity.', developmentCode: code };
+    return { success: true, message: `Verification code created for ${user.name} (${user.phone ? `mobile: ${user.phone}` : `email: ${user.email}`}).`, developmentCode: code };
   };
 
   const activateAccount = async (identifier, code, password) => {
@@ -616,11 +622,12 @@ export const DbProvider = ({ children }) => {
       }
     }
     const term = identifier.trim().toLowerCase();
-    const user = users.find(item => [item.email, item.studentId, item.staffId].filter(Boolean).some(value => value.toLowerCase() === term));
+    const cleanDigits = term.replace(/[^0-9]/g, '');
+    const user = users.find(item => [item.email, item.studentId, item.staffId, item.phone].filter(Boolean).some(value => value.toLowerCase() === term || (cleanDigits.length >= 7 && value.includes(cleanDigits))));
     if (!user || user.verificationCode !== code) return { success: false, message: 'The verification code is incorrect.' };
     const updatedUsers = users.map(item => item.id === user.id ? { ...item, password, isVerified: true, verificationCode: undefined } : item);
     syncUsers(updatedUsers);
-    return { success: true, message: 'Account verified. You can now sign in.' };
+    return { success: true, message: `Account verified and password updated for ${user.name}. You can now sign in.` };
   };
 
   const logout = async () => {
