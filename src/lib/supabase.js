@@ -1,7 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+// Supabase publishable keys are safe to expose in browser code. Environment
+// variables remain preferred, while these fallbacks keep deployed builds usable.
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://htxbrxxtchomuhshdqtw.supabase.co';
+const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_InT6fS6X6aZ33A383GxhBQ_Mn88-aO3';
 
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseKey);
 

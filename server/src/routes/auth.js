@@ -154,7 +154,7 @@ router.post('/request-verification', async (req, res) => {
     });
   } catch (error) {
     console.error('Request verification error:', error);
-    res.status(502).json({ error: error.message || 'Could not send the verification code.' });
+    res.status(503).json({ error: 'The account database is temporarily unavailable. Check the Supabase database connection, then try again.' });
   }
 });
 
