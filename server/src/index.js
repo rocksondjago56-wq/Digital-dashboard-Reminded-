@@ -1,9 +1,13 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 // Load environment variables
 dotenv.config();
+const serverDirectory = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.resolve(serverDirectory, '../../.env') });
 
 import authRoutes from './routes/auth.js';
 import deadlineRoutes from './routes/deadlines.js';

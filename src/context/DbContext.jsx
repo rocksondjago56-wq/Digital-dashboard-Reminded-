@@ -665,10 +665,10 @@ export const DbProvider = ({ children }) => {
     };
   };
 
-  const activateAccount = async (identifier, code, password) => {
+  const activateAccount = async (identifier, verificationProof, password) => {
     if (useApi) {
       try {
-        return await api.auth.activateAccount(identifier, code, password);
+        return await api.auth.activateAccount(identifier, verificationProof, password);
       } catch (error) {
         return { success: false, message: error.message };
       }
@@ -682,7 +682,7 @@ export const DbProvider = ({ children }) => {
     if (!user) return { success: false, message: 'Account not found.' };
     if (!password || password.length < 6) return { success: false, message: 'Password must be at least 6 characters.' };
 
-    if (!code?.trim() || code.trim() !== user.verificationCode) return { success: false, message: 'The verification code is incorrect.' };
+    if (!verificationProof?.trim() || verificationProof.trim() !== user.verificationCode) return { success: false, message: 'The verification code is incorrect.' };
 
     const updatedUsers = accountRecords.map(item => item.id === user.id ? { ...item, ...(password ? { password } : {}), isVerified: true, verificationCode: undefined } : item);
     syncUsers(updatedUsers);

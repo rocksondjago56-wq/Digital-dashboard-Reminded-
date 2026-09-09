@@ -3,6 +3,7 @@ import { DbContext } from '../context/DbContextDefinition';
 import './Login.css';
 import ttuLogo from '../ttu-logo.png.png';
 import { openWhatsApp, getWhatsAppConfig } from '../utils/whatsapp';
+import { sendEmailVerificationCode, verifyEmailVerificationCode } from '../lib/supabase';
 
 const CERTIFICATE_OPTIONS = ['BTech', 'HND', 'Diploma'];
 
@@ -113,12 +114,17 @@ export default function Login() {
       if (!result.success) {
         setError(result.message);
       } else if (result.requiresVerification) {
-        setSuccessMsg(result.message);
         setActivationIdentifier(regEmail.trim());
-        setCodeRequested(true);
-        setResendSeconds(60);
         setIsSignUp(false);
         setIsActivating(true);
+        try {
+          await sendEmailVerificationCode(regEmail);
+          setCodeRequested(true);
+          setResendSeconds(60);
+          setSuccessMsg('A verification code has been sent to your registered email address.');
+        } catch (error) {
+          setError(error.message || 'Could not send the Supabase verification email.');
+        }
       } else if (result.message) {
         setSuccessMsg(result.message);
       }
@@ -155,10 +161,13 @@ export default function Login() {
       const result = await requestVerification(activationIdentifier);
       if (!result.success) setError(result.message);
       else {
+        await sendEmailVerificationCode(result.email || activationIdentifier);
         setCodeRequested(true);
         setResendSeconds(60);
-        setSuccessMsg(result.message);
+        setSuccessMsg('A verification code has been sent to your registered email address.');
       }
+    } catch (error) {
+      setError(error.message || 'Could not send the verification code.');
     } finally {
       setIsSubmitting(false);
     }
@@ -170,7 +179,8 @@ export default function Login() {
     setSuccessMsg('');
     setIsSubmitting(true);
     try {
-      const result = await activateAccount(activationIdentifier, activationCode, activationPassword);
+      const accessToken = await verifyEmailVerificationCode(activationIdentifier, activationCode);
+      const result = await activateAccount(activationIdentifier, accessToken, activationPassword);
       if (!result.success) setError(result.message);
       else {
         setSuccessMsg(result.message);
@@ -178,6 +188,8 @@ export default function Login() {
         setActivationCode('');
         setActivationPassword('');
       }
+    } catch (error) {
+      setError(error.message || 'The verification code is incorrect or expired.');
     } finally {
       setIsSubmitting(false);
     }

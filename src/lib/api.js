@@ -96,7 +96,7 @@ export const api = {
 
     me: () => request('/auth/me'),
     requestVerification: (identifier) => request('/auth/request-verification', { method: 'POST', body: JSON.stringify({ identifier }) }),
-    activateAccount: (identifier, code, password) => request('/auth/activate-account', { method: 'POST', body: JSON.stringify({ identifier, code, password }) })
+    activateAccount: (identifier, accessToken, password) => request('/auth/activate-account', { method: 'POST', body: JSON.stringify({ identifier, accessToken, password }) })
   },
 
   // --- Deadlines ---

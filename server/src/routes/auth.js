@@ -3,22 +3,10 @@ import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { authenticate } from '../middleware/auth.js';
-import { getEmailDeliverySetupError, isEmailDeliveryConfigured, sendVerificationEmail } from '../services/email.js';
+import { getVerifiedSupabaseUser, isSupabaseAuthConfigured } from '../services/supabase-auth.js';
 
 const router = Router();
 const prisma = new PrismaClient();
-
-const assertEmailDeliveryConfigured = () => {
-  if (!isEmailDeliveryConfigured()) {
-    throw new Error(getEmailDeliverySetupError());
-  }
-};
-
-const sendOtp = async (user, code) => {
-  assertEmailDeliveryConfigured();
-  await sendVerificationEmail({ to: user.email, name: user.name, code });
-  return 'email address';
-};
 
 const getPhoneLookupTerms = (value) => {
   const digits = String(value || '').replace(/\D/g, '');
@@ -71,7 +59,7 @@ function formatUser(user, completedDeadlines = []) {
  */
 /**
  * POST /api/auth/signup
- * Register a new user account with one verification code delivered by email.
+ * Register a new user account. The frontend then requests the OTP from Supabase Auth.
  */
 router.post('/signup', async (req, res) => {
   try {
@@ -82,11 +70,7 @@ router.post('/signup', async (req, res) => {
     }
 
     const formattedPhone = phone ? phone.trim() : null;
-    try {
-      assertEmailDeliveryConfigured();
-    } catch (error) {
-      return res.status(503).json({ error: error.message });
-    }
+    if (!isSupabaseAuthConfigured()) return res.status(503).json({ error: 'Supabase email verification is not configured on the server.' });
 
     // Check if email already exists
     const existingEmail = await prisma.user.findUnique({ where: { email: email.trim().toLowerCase() } });
@@ -104,10 +88,6 @@ router.post('/signup', async (req, res) => {
     // Hash password
     const passwordHash = await bcrypt.hash(password, 12);
 
-    const verificationCode = String(Math.floor(100000 + Math.random() * 900000));
-    const verificationCodeHash = await bcrypt.hash(verificationCode, 10);
-    const verificationExpiresAt = new Date(Date.now() + 15 * 60 * 1000);
-
     // Build user data
     const userData = {
       name: name.trim(),
@@ -123,19 +103,17 @@ router.post('/signup', async (req, res) => {
       designation: designation || (role === 'admin' ? 'Department Administrator' : null),
       courses: Array.isArray(courses) ? courses : (typeof courses === 'string' ? courses.split(',').map(c => c.trim()).filter(Boolean) : role === 'lecturer' ? ['General Design'] : []),
       isVerified: false,
-      verificationCodeHash,
-      verificationExpiresAt
+      verificationCodeHash: null,
+      verificationExpiresAt: null
     };
 
     const user = await prisma.user.create({ data: userData });
-
-    const deliveredTo = await sendOtp(user, verificationCode);
 
     res.status(201).json({
       success: true,
       user: formatUser(user),
       requiresVerification: true,
-      message: `Account created. A verification code was sent to your registered ${deliveredTo}.`
+      message: 'Account created. Send a verification code to your registered email address to activate it.'
     });
   } catch (error) {
     console.error('Signup error:', error);
@@ -163,33 +141,16 @@ const findIdentity = (identifier) => {
 router.post('/request-verification', async (req, res) => {
   try {
     const { identifier } = req.body;
-    if (!identifier) return res.status(400).json({ error: 'Enter your TTU email, mobile number, index number, or staff ID.' });
+    if (!identifier) return res.status(400).json({ error: 'Enter the email address you used to sign up.' });
 
     const user = await findIdentity(identifier);
     if (!user) return res.status(404).json({ error: 'No account or preloaded identity was found for this detail.' });
-    try {
-      assertEmailDeliveryConfigured();
-    } catch (error) {
-      return res.status(503).json({ error: error.message });
-    }
-
-    const verificationCode = String(Math.floor(100000 + Math.random() * 900000));
-    const verificationCodeHash = await bcrypt.hash(verificationCode, 10);
-    const verificationExpiresAt = new Date(Date.now() + 15 * 60 * 1000);
-
-    await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        verificationCodeHash,
-        verificationExpiresAt
-      }
-    });
-
-    const deliveredTo = await sendOtp(user, verificationCode);
+    if (!isSupabaseAuthConfigured()) return res.status(503).json({ error: 'Supabase email verification is not configured on the server.' });
 
     res.json({
       success: true,
-      message: `A 6-digit verification code was sent to your registered ${deliveredTo}.`
+      email: user.email,
+      message: 'A verification code will be sent to your registered email address.'
     });
   } catch (error) {
     console.error('Request verification error:', error);
@@ -199,19 +160,16 @@ router.post('/request-verification', async (req, res) => {
 
 router.post('/activate-account', async (req, res) => {
   try {
-    const { identifier, code, password } = req.body;
+    const { identifier, accessToken, password } = req.body;
     if (!identifier) return res.status(400).json({ error: 'Email address is required.' });
     if (!password || password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters.' });
 
     const user = await findIdentity(identifier);
-    if (!user || !user.verificationCodeHash || !user.verificationExpiresAt) {
-      return res.status(400).json({ error: 'Please request a new verification code before activating your account.' });
-    }
-    if (user.verificationExpiresAt < new Date()) {
-      return res.status(400).json({ error: 'The verification code has expired. Please request a new code.' });
-    }
-    if (!code?.trim() || !(await bcrypt.compare(code.trim(), user.verificationCodeHash))) {
-      return res.status(400).json({ error: 'The verification code is incorrect.' });
+    if (!user) return res.status(404).json({ error: 'Account not found.' });
+
+    const verifiedSupabaseUser = await getVerifiedSupabaseUser(accessToken);
+    if (verifiedSupabaseUser.email?.toLowerCase() !== user.email.toLowerCase()) {
+      return res.status(403).json({ error: 'The verification code belongs to a different email address.' });
     }
 
     const updateData = {
