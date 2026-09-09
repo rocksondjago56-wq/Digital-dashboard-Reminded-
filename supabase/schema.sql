@@ -18,9 +18,14 @@ create table public.profiles (
   courses text[] not null default '{}',
   requested_role text check (requested_role in ('student', 'student_head', 'lecturer', 'admin')),
   requested_courses text[] not null default '{}',
+  phone text unique,
   profile_picture_url text,
-  is_verified boolean not null default true,
+  is_verified boolean not null default false,
+  email_verified boolean not null default false,
+  phone_verified boolean not null default false,
   verification_code_hash text,
+  email_code_hash text,
+  phone_code_hash text,
   verification_expires_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -87,6 +92,7 @@ begin
     id,
     name,
     email,
+    phone,
     role,
     year,
     certificate,
@@ -95,12 +101,16 @@ begin
     designation,
     courses,
     requested_role,
-    requested_courses
+    requested_courses,
+    is_verified,
+    email_verified,
+    phone_verified
   )
   values (
     new.id,
     coalesce(nullif(new.raw_user_meta_data ->> 'name', ''), split_part(new.email, '@', 1)),
     new.email,
+    nullif(new.raw_user_meta_data ->> 'phone', ''),
     case
       when requested = 'student_head' then 'student_head'::public.user_role
       else 'student'::public.user_role
@@ -115,7 +125,10 @@ begin
       when requested in ('student', 'student_head', 'lecturer', 'admin') then requested
       else 'student'
     end,
-    requested_courses
+    requested_courses,
+    coalesce((new.raw_user_meta_data ->> 'is_verified')::boolean, false),
+    coalesce((new.raw_user_meta_data ->> 'email_verified')::boolean, false),
+    coalesce((new.raw_user_meta_data ->> 'phone_verified')::boolean, false)
   );
   return new;
 end;

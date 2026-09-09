@@ -1,7 +1,12 @@
 import nodemailer from 'nodemailer';
 
+export const isEmailDeliveryConfigured = () => Boolean(
+  process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS
+);
+
 export async function sendVerificationEmail({ to, name, code }) {
-  const hasSmtpConfig = process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS;
+  console.log(`\n✉️ [Email Service] Verification Code sent to Email (${to}): [ ${code} ] for user ${name}`);
+  const hasSmtpConfig = isEmailDeliveryConfigured();
 
   if (!hasSmtpConfig) {
     return { delivered: false, developmentCode: process.env.NODE_ENV === 'production' ? undefined : code };

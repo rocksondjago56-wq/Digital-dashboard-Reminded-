@@ -10,6 +10,22 @@ This project is being prepared to use Supabase for authentication, database stor
 4. In Supabase Authentication settings, set the production site URL and allowed redirect URLs, then keep email confirmation enabled.
 5. Run `supabase/migrations/002_lecturer_requests.sql` after the main schema.
 6. For an existing Supabase project, also run `supabase/migrations/003_profile_signup_details.sql` so new portal accounts appear with their role request, year, index number, staff ID, and course details.
+7. Run `supabase/migrations/006_dual_verification.sql` to add dual-verification profile fields for existing projects.
+
+## Email and phone verification
+
+The Express API stores password and verification hashes in the database, while the Supabase project can provide the PostgreSQL database through `DATABASE_URL`. Configure the backend email and SMS senders before deploying:
+
+```env
+SMTP_HOST=your-smtp-host
+SMTP_USER=your-smtp-user
+SMTP_PASS=your-smtp-password
+TWILIO_ACCOUNT_SID=your-twilio-account-sid
+TWILIO_AUTH_TOKEN=your-twilio-auth-token
+TWILIO_FROM_NUMBER=+12345678900
+```
+
+In development only, codes are returned to the app when delivery credentials are unavailable. Production never returns verification codes in API responses. Users must verify both the email code and SMS code before sign-in.
 
 Public users may request a lecturer or administrator account, but the department should approve elevated access by changing the profile role in Supabase.
 

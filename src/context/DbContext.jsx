@@ -530,6 +530,9 @@ export const DbProvider = ({ children }) => {
     if (user) {
       const expectedPassword = user.password || `${user.role}123`;
       if (password === expectedPassword) {
+        if (!user.isVerified) {
+          return { success: false, message: 'Account verification is required. Verify your email and phone codes before signing in.', requiresVerification: true };
+        }
         const updatedUsers = [
           ...accountRecords.filter(u => u.email?.toLowerCase() !== user.email.toLowerCase()),
           user
@@ -564,7 +567,14 @@ export const DbProvider = ({ children }) => {
             setCurrentUser(result.user);
           }
           addNotification(`New user registered: ${result.user?.name || name} (${role})`);
-          return { success: true, user: result.user, message: result.message, developmentCode: result.developmentCode, requiresVerification: result.requiresVerification };
+          return {
+            success: true,
+            user: result.user,
+            message: result.message,
+            developmentEmailCode: result.developmentEmailCode,
+            developmentPhoneCode: result.developmentPhoneCode,
+            requiresVerification: result.requiresVerification
+          };
         }
         return { success: false, message: result.error || 'Signup failed.' };
       } catch (error) {
@@ -574,6 +584,7 @@ export const DbProvider = ({ children }) => {
 
     // localStorage Mode (original logic)
     const emailLower = email.trim().toLowerCase();
+    if (!extraFields.phone?.trim()) return { success: false, message: 'Mobile phone number is required for account verification.' };
     const savedUsers = getSavedUsers();
     const accountRecords = savedUsers || users;
 
@@ -582,6 +593,8 @@ export const DbProvider = ({ children }) => {
       return { success: false, message: 'This email is already registered. Use Sign In instead.' };
     }
 
+    const emailVerificationCode = String(Math.floor(100000 + Math.random() * 900000));
+    const phoneVerificationCode = String(Math.floor(100000 + Math.random() * 900000));
     const newUser = {
       id: `u_${Date.now()}`,
       name: name.trim(),
@@ -590,6 +603,11 @@ export const DbProvider = ({ children }) => {
       role,
       department: 'Graphic Design',
       ...extraFields,
+      isVerified: false,
+      emailVerified: false,
+      phoneVerified: false,
+      emailVerificationCode,
+      phoneVerificationCode,
       completedDeadlines: (role === 'student' || role === 'student_head') ? [] : undefined,
       year: extraFields.year || (role === 'student' || role === 'student_head' ? 'Year 1' : undefined),
       certificate: extraFields.certificate || (role === 'student' || role === 'student_head' ? 'BTech' : undefined),
@@ -599,10 +617,15 @@ export const DbProvider = ({ children }) => {
 
     const updatedUsers = [...accountRecords, newUser];
     syncUsers(updatedUsers);
-    setCurrentUser(newUser);
-    localStorage.setItem(CURRENT_USER_STORAGE_KEY, JSON.stringify(newUser));
     addNotification(`New local user registered: ${newUser.name} (${newUser.role})`);
-    return { success: true, user: newUser };
+    return {
+      success: true,
+      user: newUser,
+      requiresVerification: true,
+      message: 'Account created. Enter both development codes to finish verification.',
+      developmentEmailCode: emailVerificationCode,
+      developmentPhoneCode: phoneVerificationCode
+    };
   };
 
   const requestVerification = async (identifier) => {
@@ -618,28 +641,55 @@ export const DbProvider = ({ children }) => {
       [item.email, item.studentId, item.staffId].filter(Boolean).some(value => value.toLowerCase() === term) || matchesPhone(item.phone, term)
     );
     if (!user) return { success: false, message: 'No account or preloaded identity was found.' };
-    const code = String(Math.floor(100000 + Math.random() * 900000));
-    const updated = users.map(item => item.id === user.id ? { ...item, verificationCode: code, isVerified: false } : item);
+    const emailCode = String(Math.floor(100000 + Math.random() * 900000));
+    const phoneCode = String(Math.floor(100000 + Math.random() * 900000));
+    const accountRecords = getSavedUsers() || users;
+    const updated = accountRecords.map(item => item.id === user.id ? { ...item, emailVerificationCode: emailCode, phoneVerificationCode: phoneCode, verificationCode: emailCode, isVerified: false, emailVerified: false, phoneVerified: false } : item);
     syncUsers(updated);
-    return { success: true, message: `Verification code created for ${user.name} (${user.phone ? `mobile: ${user.phone}` : `email: ${user.email}`}).`, developmentCode: code };
+    return {
+      success: true,
+      message: `Verification codes generated for ${user.name}: Email (${user.email}) and Mobile (${user.phone || 'phone'}).`,
+      developmentEmailCode: emailCode,
+      developmentPhoneCode: phoneCode,
+      developmentCode: `Email Code: ${emailCode} | Phone Code: ${phoneCode}`
+    };
   };
 
-  const activateAccount = async (identifier, code, password) => {
+  const activateAccount = async (identifier, emailCode, phoneCode, password) => {
     if (useApi) {
       try {
-        return await api.auth.activateAccount(identifier, code, password);
+        return await api.auth.activateAccount(identifier, emailCode, phoneCode, password);
       } catch (error) {
         return { success: false, message: error.message };
       }
     }
     const term = identifier.trim().toLowerCase();
-    const user = users.find(item =>
+    const accountRecords = getSavedUsers() || users;
+    const user = accountRecords.find(item =>
       [item.email, item.studentId, item.staffId].filter(Boolean).some(value => value.toLowerCase() === term) || matchesPhone(item.phone, term)
     );
-    if (!user || user.verificationCode !== code) return { success: false, message: 'The verification code is incorrect.' };
-    const updatedUsers = users.map(item => item.id === user.id ? { ...item, password, isVerified: true, verificationCode: undefined } : item);
+
+    if (!user) return { success: false, message: 'Account not found.' };
+
+    const expectedEmailCode = user.emailVerificationCode || user.verificationCode;
+    const expectedPhoneCode = user.phoneVerificationCode || user.verificationCode;
+
+    const inputEmail = emailCode ? emailCode.trim() : '';
+    const inputPhone = phoneCode ? phoneCode.trim() : '';
+
+    if (inputEmail !== expectedEmailCode && inputPhone !== expectedPhoneCode) {
+      return { success: false, message: 'Both Email Code and Phone Code are incorrect.' };
+    }
+    if (inputEmail !== expectedEmailCode) {
+      return { success: false, message: 'The Email Verification Code is incorrect.' };
+    }
+    if (inputPhone !== expectedPhoneCode) {
+      return { success: false, message: 'The Phone Verification Code is incorrect.' };
+    }
+
+    const updatedUsers = accountRecords.map(item => item.id === user.id ? { ...item, ...(password ? { password } : {}), isVerified: true, emailVerified: true, phoneVerified: true, emailVerificationCode: undefined, phoneVerificationCode: undefined, verificationCode: undefined } : item);
     syncUsers(updatedUsers);
-    return { success: true, message: `Account verified and password updated for ${user.name}. You can now sign in.` };
+    return { success: true, message: `Account dual verification complete for ${user.name}! You can now sign in.` };
   };
 
   const logout = async () => {

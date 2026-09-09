@@ -18,10 +18,12 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [activationIdentifier, setActivationIdentifier] = useState('');
-  const [activationCode, setActivationCode] = useState('');
+  const [activationEmailCode, setActivationEmailCode] = useState('');
+  const [activationPhoneCode, setActivationPhoneCode] = useState('');
   const [activationPassword, setActivationPassword] = useState('');
   const [codeRequested, setCodeRequested] = useState(false);
-  const [developmentCode, setDevelopmentCode] = useState('');
+  const [developmentEmailCode, setDevelopmentEmailCode] = useState('');
+  const [developmentPhoneCode, setDevelopmentPhoneCode] = useState('');
 
   // Sign Up State
   const [regName, setRegName] = useState('');
@@ -29,7 +31,6 @@ export default function Login() {
   const [regPassword, setRegPassword] = useState('');
   const [regRole, setRegRole] = useState('student');
   const [regPhone, setRegPhone] = useState('');
-  const [verifyViaMobile, setVerifyViaMobile] = useState(true);
 
   // Student extra fields
   const [regYear, setRegYear] = useState('Year 1');
@@ -60,6 +61,11 @@ export default function Login() {
       const result = await login(email, password);
       if (!result.success) {
         setError(result.message);
+        if (result.requiresVerification) {
+          setActivationIdentifier(result.identifier || email);
+          setIsActivating(true);
+          setCodeRequested(false);
+        }
       }
     } finally {
       setIsSubmitting(false);
@@ -77,8 +83,8 @@ export default function Login() {
       return;
     }
 
-    if ((regRole === 'lecturer' || regRole === 'admin') && !regPhone.trim()) {
-      setError('Mobile phone number is required for staff account registration.');
+    if (!regPhone.trim()) {
+      setError('Mobile phone number is required for account verification.');
       return;
     }
 
@@ -88,8 +94,7 @@ export default function Login() {
     }
 
     const extraFields = {
-      phone: regPhone.trim(),
-      verifyViaMobile: (regRole === 'lecturer' || regRole === 'admin') ? verifyViaMobile : false
+      phone: regPhone.trim()
     };
 
     if (regRole === 'student') {
@@ -113,7 +118,8 @@ export default function Login() {
       } else if (result.requiresVerification) {
         setSuccessMsg(result.message);
         setActivationIdentifier(regPhone.trim() || regEmail.trim());
-        setDevelopmentCode(result.developmentCode || '');
+        setDevelopmentEmailCode(result.developmentEmailCode || '');
+        setDevelopmentPhoneCode(result.developmentPhoneCode || '');
         setCodeRequested(true);
         setIsSignUp(false);
         setIsActivating(true);
@@ -137,7 +143,8 @@ export default function Login() {
     setError('');
     setSuccessMsg('');
     setCodeRequested(false);
-    setDevelopmentCode('');
+    setDevelopmentEmailCode('');
+    setDevelopmentPhoneCode('');
   };
 
   const handleRequestVerification = async () => {
@@ -153,7 +160,8 @@ export default function Login() {
       if (!result.success) setError(result.message);
       else {
         setCodeRequested(true);
-        setDevelopmentCode(result.developmentCode || '');
+        setDevelopmentEmailCode(result.developmentEmailCode || '');
+        setDevelopmentPhoneCode(result.developmentPhoneCode || '');
         setSuccessMsg(result.message);
       }
     } finally {
@@ -167,12 +175,13 @@ export default function Login() {
     setSuccessMsg('');
     setIsSubmitting(true);
     try {
-      const result = await activateAccount(activationIdentifier, activationCode, activationPassword);
+      const result = await activateAccount(activationIdentifier, activationEmailCode, activationPhoneCode, activationPassword);
       if (!result.success) setError(result.message);
       else {
         setSuccessMsg(result.message);
         setIsActivating(false);
-        setActivationCode('');
+        setActivationEmailCode('');
+        setActivationPhoneCode('');
         setActivationPassword('');
       }
     } finally {
@@ -228,13 +237,15 @@ export default function Login() {
                 <input id="activationIdentifier" value={activationIdentifier} onChange={(e) => setActivationIdentifier(e.target.value)} placeholder="e.g. 0241234567, 0420210088, or LEC-0492" required />
               </div>
               {!codeRequested ? (
-                <button type="button" className="btn btn-primary w-full mt-2" disabled={isSubmitting} onClick={handleRequestVerification}>Send Email Verification Code</button>
+                <button type="button" className="btn btn-primary w-full mt-2" disabled={isSubmitting} onClick={handleRequestVerification}>Send Email and Phone Codes</button>
               ) : (
                 <>
-                  <div className="form-group"><label htmlFor="activationCode">Verification Code</label><input id="activationCode" value={activationCode} onChange={(e) => setActivationCode(e.target.value)} placeholder="6-digit verification code" required /></div>
+                  <div className="form-group"><label htmlFor="activationEmailCode">Email Verification Code</label><input id="activationEmailCode" inputMode="numeric" value={activationEmailCode} onChange={(e) => setActivationEmailCode(e.target.value)} placeholder="6-digit code from email" required /></div>
+                  <div className="form-group"><label htmlFor="activationPhoneCode">Phone Verification Code</label><input id="activationPhoneCode" inputMode="numeric" value={activationPhoneCode} onChange={(e) => setActivationPhoneCode(e.target.value)} placeholder="6-digit code from SMS" required /></div>
                   <div className="form-group"><label htmlFor="activationPassword">Create / Change Password</label><input id="activationPassword" type="password" value={activationPassword} onChange={(e) => setActivationPassword(e.target.value)} placeholder="At least 6 characters" required /></div>
-                  {developmentCode && <p className="development-code">Development verification code: {developmentCode}</p>}
-                  <button type="submit" className="btn btn-accent w-full mt-2" disabled={isSubmitting}>{isSubmitting ? 'Verifying...' : 'Verify Code & Set Password'}</button>
+                  {developmentEmailCode && <p className="development-code">Development email code: {developmentEmailCode}</p>}
+                  {developmentPhoneCode && <p className="development-code">Development phone code: {developmentPhoneCode}</p>}
+                  <button type="submit" className="btn btn-accent w-full mt-2" disabled={isSubmitting}>{isSubmitting ? 'Verifying...' : 'Verify Both Codes & Set Password'}</button>
                 </>
               )}
             </form>
@@ -337,7 +348,7 @@ export default function Login() {
               {/* MOBILE PHONE NUMBER FIELD */}
               <div className="form-group">
                 <label htmlFor="regPhone">
-                  Mobile Phone Number {(regRole === 'lecturer' || regRole === 'admin') ? '(Required for Mobile Verification)' : '(Optional)'}
+                  Mobile Phone Number (Required for Verification)
                 </label>
                 <input
                   type="tel"
@@ -345,22 +356,9 @@ export default function Login() {
                   placeholder="e.g. 0241234567 or +233241234567"
                   value={regPhone}
                   onChange={(e) => setRegPhone(e.target.value)}
-                  required={regRole === 'lecturer' || regRole === 'admin'}
+                  required
                 />
               </div>
-
-              {(regRole === 'lecturer' || regRole === 'admin') && (
-                <div className="form-group" style={{ marginTop: '-4px', marginBottom: '16px' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 500, fontSize: '0.85rem', color: '#475569' }}>
-                    <input
-                      type="checkbox"
-                      checked={verifyViaMobile}
-                      onChange={(e) => setVerifyViaMobile(e.target.checked)}
-                    />
-                    <span>Verify with mobile code to set/confirm password</span>
-                  </label>
-                </div>
-              )}
 
               {/* STUDENT ROLE FIELDS */}
               {regRole === 'student' && (

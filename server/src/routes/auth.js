@@ -3,10 +3,12 @@ import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { authenticate } from '../middleware/auth.js';
-import { sendVerificationEmail } from '../services/email.js';
+import { isEmailDeliveryConfigured, sendVerificationEmail } from '../services/email.js';
+import { isSmsDeliveryConfigured, sendVerificationSMS } from '../services/sms.js';
 
 const router = Router();
 const prisma = new PrismaClient();
+const isProduction = process.env.NODE_ENV === 'production';
 
 const getPhoneLookupTerms = (value) => {
   const digits = String(value || '').replace(/\D/g, '');
@@ -48,7 +50,9 @@ function formatUser(user, completedDeadlines = []) {
     designation: user.designation,
     courses: user.courses || [],
     profilePic: user.profilePictureUrl,
-    isVerified: user.isVerified,
+    isVerified: Boolean(user.isVerified),
+    emailVerified: Boolean(user.emailVerified),
+    phoneVerified: Boolean(user.phoneVerified),
     completedDeadlines
   };
 }
@@ -57,12 +61,24 @@ function formatUser(user, completedDeadlines = []) {
  * POST /api/auth/signup
  * Register a new user account.
  */
+/**
+ * POST /api/auth/signup
+ * Register a new user account with mandatory dual verification (Email & Phone).
+ */
 router.post('/signup', async (req, res) => {
   try {
-    const { name, email, password, role = 'student', year, certificate, studentId, indexNumber, staffId, phone, designation, courses, verifyViaMobile } = req.body;
+    const { name, email, password, role = 'student', year, certificate, studentId, indexNumber, staffId, phone, designation, courses } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({ error: 'Name, email, and password are required.' });
+    }
+
+    const formattedPhone = phone ? phone.trim() : null;
+    if (!formattedPhone) {
+      return res.status(400).json({ error: 'Mobile phone number is required for account verification.' });
+    }
+    if (isProduction && (!isEmailDeliveryConfigured() || !isSmsDeliveryConfigured())) {
+      return res.status(503).json({ error: 'Account verification is temporarily unavailable. Contact the department administrator.' });
     }
 
     // Check if email already exists
@@ -71,33 +87,26 @@ router.post('/signup', async (req, res) => {
       return res.status(409).json({ error: 'This email is already registered. Use Sign In instead.' });
     }
 
-    // Check if phone already exists if provided
-    const formattedPhone = phone ? phone.trim() : null;
+    // Check if phone already exists
     const phoneTerms = getPhoneLookupTerms(formattedPhone);
-    if (formattedPhone) {
-      const existingPhone = await prisma.user.findFirst({
-        where: { OR: phoneTerms.map(value => ({ phone: { contains: value } })) }
-      });
-      if (existingPhone) {
-        return res.status(409).json({ error: 'This mobile number is already registered to an account.' });
-      }
+    const existingPhone = await prisma.user.findFirst({
+      where: { OR: phoneTerms.map(value => ({ phone: { contains: value } })) }
+    });
+    if (existingPhone) {
+      return res.status(409).json({ error: 'This mobile number is already registered to an account.' });
     }
 
     // Hash password
     const passwordHash = await bcrypt.hash(password, 12);
 
-    const isStaff = role === 'lecturer' || role === 'admin';
-    const isVerified = !(isStaff && verifyViaMobile);
+    // Generate dual verification codes (Email Code and Phone Code)
+    const emailCode = String(Math.floor(100000 + Math.random() * 900000));
+    const phoneCode = String(Math.floor(100000 + Math.random() * 900000));
 
-    let verificationCodeHash = null;
-    let verificationExpiresAt = null;
-    let devCode = null;
-
-    if (!isVerified) {
-      devCode = String(Math.floor(100000 + Math.random() * 900000));
-      verificationCodeHash = await bcrypt.hash(devCode, 10);
-      verificationExpiresAt = new Date(Date.now() + 15 * 60 * 1000);
-    }
+    const emailCodeHash = await bcrypt.hash(emailCode, 10);
+    const phoneCodeHash = await bcrypt.hash(phoneCode, 10);
+    const verificationCodeHash = await bcrypt.hash(emailCode, 10);
+    const verificationExpiresAt = new Date(Date.now() + 15 * 60 * 1000);
 
     // Build user data
     const userData = {
@@ -113,7 +122,11 @@ router.post('/signup', async (req, res) => {
       phone: formattedPhone,
       designation: designation || (role === 'admin' ? 'Department Administrator' : null),
       courses: Array.isArray(courses) ? courses : (typeof courses === 'string' ? courses.split(',').map(c => c.trim()).filter(Boolean) : role === 'lecturer' ? ['General Design'] : []),
-      isVerified,
+      isVerified: false,
+      emailVerified: false,
+      phoneVerified: false,
+      emailCodeHash,
+      phoneCodeHash,
       verificationCodeHash,
       verificationExpiresAt
     };
@@ -121,19 +134,17 @@ router.post('/signup', async (req, res) => {
     const user = await prisma.user.create({ data: userData });
     const token = generateToken(user);
 
-    if (!isVerified && formattedPhone) {
-      sendVerificationEmail({ to: user.email, name: user.name, code: devCode }).catch(() => {});
-    }
+    // Dispatch verification codes to both Email and Phone
+    const emailRes = await sendVerificationEmail({ to: user.email, name: user.name, code: emailCode });
+    const smsRes = await sendVerificationSMS({ to: user.phone, name: user.name, code: phoneCode });
 
     res.status(201).json({
       success: true,
       token,
       user: formatUser(user),
-      requiresVerification: !isVerified,
-      developmentCode: devCode,
-      message: isVerified
-        ? 'Account created successfully!'
-        : `Staff account created! A 6-digit verification code was sent to ${user.email}. The registered mobile number can also be used to identify the account.`
+      requiresVerification: true,
+      ...(isProduction ? {} : { developmentEmailCode: emailRes.developmentCode, developmentPhoneCode: smsRes.developmentCode }),
+      message: `Account created successfully! Verification codes have been sent to your email (${user.email}) and phone number (${user.phone}). Please enter both codes to verify your account.`
     });
   } catch (error) {
     console.error('Signup error:', error);
@@ -165,50 +176,124 @@ router.post('/request-verification', async (req, res) => {
 
     const user = await findIdentity(identifier);
     if (!user) return res.status(404).json({ error: 'No account or preloaded identity was found for this detail.' });
+    if (!user.phone) return res.status(400).json({ error: 'This account has no registered mobile number. Contact the department administrator.' });
+    if (isProduction && (!isEmailDeliveryConfigured() || !isSmsDeliveryConfigured())) {
+      return res.status(503).json({ error: 'Account verification is temporarily unavailable. Contact the department administrator.' });
+    }
 
-    const code = String(Math.floor(100000 + Math.random() * 900000));
-    const verificationCodeHash = await bcrypt.hash(code, 10);
+    const emailCode = String(Math.floor(100000 + Math.random() * 900000));
+    const phoneCode = String(Math.floor(100000 + Math.random() * 900000));
+
+    const emailCodeHash = await bcrypt.hash(emailCode, 10);
+    const phoneCodeHash = await bcrypt.hash(phoneCode, 10);
+    const verificationCodeHash = await bcrypt.hash(emailCode, 10);
+    const verificationExpiresAt = new Date(Date.now() + 15 * 60 * 1000);
+
     await prisma.user.update({
       where: { id: user.id },
-      data: { verificationCodeHash, verificationExpiresAt: new Date(Date.now() + 15 * 60 * 1000) }
+      data: {
+        emailCodeHash,
+        phoneCodeHash,
+        verificationCodeHash,
+        verificationExpiresAt
+      }
     });
 
-    const delivery = await sendVerificationEmail({ to: user.email, name: user.name, code });
-    const targetDesc = user.phone ? `TTU email (${user.email}). The registered mobile number (${user.phone}) can also be used to find this account` : `TTU email (${user.email})`;
+    const emailRes = await sendVerificationEmail({ to: user.email, name: user.name, code: emailCode });
+    const smsRes = await sendVerificationSMS({ to: user.phone, name: user.name, code: phoneCode });
+
     res.json({
       success: true,
-      message: `A 6-digit verification code has been generated for your ${targetDesc}.`,
-      developmentCode: delivery.developmentCode || code
+      message: `6-digit verification codes have been sent to your email (${user.email}) and phone number (${user.phone}).`,
+      ...(isProduction ? {} : { developmentEmailCode: emailRes.developmentCode, developmentPhoneCode: smsRes.developmentCode })
     });
   } catch (error) {
     console.error('Request verification error:', error);
-    res.status(500).json({ error: 'Could not send the verification code.' });
+    res.status(500).json({ error: 'Could not send verification codes.' });
   }
 });
 
 router.post('/activate-account', async (req, res) => {
   try {
-    const { identifier, code, password } = req.body;
-    if (!identifier || !code || !password) return res.status(400).json({ error: 'Identifier, verification code, and password are required.' });
-    if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters.' });
+    const { identifier, emailCode, phoneCode, code, password } = req.body;
+    if (!identifier) return res.status(400).json({ error: 'Email or phone number identifier is required.' });
+    if (!password || password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters.' });
 
     const user = await findIdentity(identifier);
-    if (!user || !user.verificationCodeHash || !user.verificationExpiresAt) {
-      return res.status(400).json({ error: 'Request a new verification code before verifying your account or updating password.' });
+    if (!user || (!user.emailCodeHash && !user.verificationCodeHash) || !user.verificationExpiresAt) {
+      return res.status(400).json({ error: 'Please request new verification codes before activating your account.' });
     }
-    if (user.verificationExpiresAt < new Date()) return res.status(400).json({ error: 'This verification code has expired. Request another code.' });
-    if (!(await bcrypt.compare(code, user.verificationCodeHash))) return res.status(400).json({ error: 'The verification code is incorrect.' });
+    if (user.verificationExpiresAt < new Date()) {
+      return res.status(400).json({ error: 'The verification codes have expired. Please request new codes.' });
+    }
+
+    // Determine codes submitted
+    let inputEmailCode = emailCode ? emailCode.trim() : '';
+    let inputPhoneCode = phoneCode ? phoneCode.trim() : '';
+
+    if (!inputEmailCode && !inputPhoneCode && code) {
+      const parts = code.split(/[,|;/\s]+/);
+      if (parts.length >= 2) {
+        inputEmailCode = parts[0];
+        inputPhoneCode = parts[1];
+      } else {
+        inputEmailCode = code.trim();
+        inputPhoneCode = code.trim();
+      }
+    }
+
+    if (!inputEmailCode || !inputPhoneCode) {
+      return res.status(400).json({ error: 'Both Email Verification Code and Phone Verification Code are required.' });
+    }
+
+    // Check Email Code
+    let emailMatch = false;
+    if (user.emailCodeHash) {
+      emailMatch = await bcrypt.compare(inputEmailCode, user.emailCodeHash);
+    } else if (user.verificationCodeHash) {
+      emailMatch = await bcrypt.compare(inputEmailCode, user.verificationCodeHash);
+    }
+
+    // Check Phone Code
+    let phoneMatch = false;
+    if (user.phoneCodeHash) {
+      phoneMatch = await bcrypt.compare(inputPhoneCode, user.phoneCodeHash);
+    } else if (user.verificationCodeHash) {
+      phoneMatch = await bcrypt.compare(inputPhoneCode, user.verificationCodeHash);
+    }
+
+    if (!emailMatch && !phoneMatch) {
+      return res.status(400).json({ error: 'Both Email Code and Phone Code are incorrect.' });
+    }
+    if (!emailMatch) {
+      return res.status(400).json({ error: 'The Email Verification Code is incorrect.' });
+    }
+    if (!phoneMatch) {
+      return res.status(400).json({ error: 'The Phone Verification Code is incorrect.' });
+    }
+
+    const updateData = {
+      isVerified: true,
+      emailVerified: true,
+      phoneVerified: true,
+      emailCodeHash: null,
+      phoneCodeHash: null,
+      verificationCodeHash: null,
+      verificationExpiresAt: null
+    };
+
+    updateData.passwordHash = await bcrypt.hash(password, 12);
 
     const activated = await prisma.user.update({
       where: { id: user.id },
-      data: {
-        passwordHash: await bcrypt.hash(password, 12),
-        isVerified: true,
-        verificationCodeHash: null,
-        verificationExpiresAt: null
-      }
+      data: updateData
     });
-    res.json({ success: true, message: `Account verified and password set successfully for ${activated.name}! You can now sign in.` });
+
+    res.json({
+      success: true,
+      message: `Account dual verification complete for ${activated.name}! Your email and phone number are verified. You can now sign in.`,
+      user: formatUser(activated)
+    });
   } catch (error) {
     console.error('Activate account error:', error);
     res.status(500).json({ error: 'Could not activate or verify your account.' });
@@ -218,6 +303,7 @@ router.post('/activate-account', async (req, res) => {
 /**
  * POST /api/auth/login
  * Authenticate with email, name, studentId, staffId, or mobile phone + password.
+ * Blocks unverified users until dual verification is completed.
  */
 router.post('/login', async (req, res) => {
   try {
@@ -248,14 +334,19 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Account not found. Use your email, mobile number, full name, index number, or staff ID.' });
     }
 
-    if (!user.isVerified) {
-      return res.status(403).json({ error: 'This staff or department identity has not been verified. Verify with your mobile number / code first to set your password.' });
-    }
-
-    // Verify password
+    // Verify password first
     const isValid = await bcrypt.compare(password, user.passwordHash);
     if (!isValid) {
       return res.status(401).json({ error: 'Incorrect password.' });
+    }
+
+    // Require dual account verification before gaining system access
+    if (!user.isVerified) {
+      return res.status(403).json({
+        error: 'Account verification required. Verification codes were sent to your email and phone number. Please enter both codes to gain access.',
+        requiresVerification: true,
+        identifier: user.email
+      });
     }
 
     // Get completed deadlines for students
