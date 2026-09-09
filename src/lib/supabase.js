@@ -20,7 +20,13 @@ export async function sendEmailVerificationCode(email) {
     email: email.trim().toLowerCase(),
     options: { shouldCreateUser: true }
   });
-  if (error) throw error;
+  if (error) {
+    const message = error.message?.toLowerCase() || '';
+    if (error.code === 'email_address_not_authorized' || message.includes('sending magic link email')) {
+      throw new Error('Supabase cannot send to this email with its default sender. Add this email to your Supabase Organization Team for testing, or configure Custom SMTP in Supabase Auth.');
+    }
+    throw error;
+  }
 }
 
 export async function verifyEmailVerificationCode(email, code) {
