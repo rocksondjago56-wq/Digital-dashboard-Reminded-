@@ -643,10 +643,10 @@ export const DbProvider = ({ children }) => {
     };
   };
 
-  const requestVerification = async (identifier, deliveryChannel = 'email') => {
+  const requestVerification = async (identifier) => {
     if (useApi) {
       try {
-        return await api.auth.requestVerification(identifier, deliveryChannel);
+        return await api.auth.requestVerification(identifier);
       } catch (error) {
         return { success: false, message: error.message };
       }
@@ -662,7 +662,7 @@ export const DbProvider = ({ children }) => {
     syncUsers(updated);
     return {
       success: true,
-      message: `A verification code was sent to the registered ${deliveryChannel === 'sms' ? 'mobile number' : 'email address'}.`
+      message: 'A verification code was sent to the registered email address.'
     };
   };
 

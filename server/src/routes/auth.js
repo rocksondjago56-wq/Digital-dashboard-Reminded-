@@ -4,34 +4,18 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { authenticate } from '../middleware/auth.js';
 import { isEmailDeliveryConfigured, sendVerificationEmail } from '../services/email.js';
-import { isSmsDeliveryConfigured, isWhatsAppDeliveryConfigured, sendVerificationSMS, sendVerificationWhatsApp } from '../services/sms.js';
 
 const router = Router();
 const prisma = new PrismaClient();
 
-const getDeliveryChannel = (channel) => (['sms', 'whatsapp'].includes(channel) ? channel : 'email');
-
-const assertDeliveryConfigured = (channel) => {
-  if (
-    (channel === 'email' && !isEmailDeliveryConfigured()) ||
-    (channel === 'sms' && !isSmsDeliveryConfigured()) ||
-    (channel === 'whatsapp' && !isWhatsAppDeliveryConfigured())
-  ) {
+const assertEmailDeliveryConfigured = () => {
+  if (!isEmailDeliveryConfigured()) {
     throw new Error('Verification delivery is temporarily unavailable. Contact the department administrator.');
   }
 };
 
-const sendOtp = async (user, code, requestedChannel) => {
-  const channel = getDeliveryChannel(requestedChannel);
-  assertDeliveryConfigured(channel);
-  if (channel === 'sms') {
-    await sendVerificationSMS({ to: user.phone, name: user.name, code });
-    return 'mobile number';
-  }
-  if (channel === 'whatsapp') {
-    await sendVerificationWhatsApp({ to: user.phone, name: user.name, code });
-    return 'WhatsApp number';
-  }
+const sendOtp = async (user, code) => {
+  assertEmailDeliveryConfigured();
   await sendVerificationEmail({ to: user.email, name: user.name, code });
   return 'email address';
 };
@@ -87,22 +71,19 @@ function formatUser(user, completedDeadlines = []) {
  */
 /**
  * POST /api/auth/signup
- * Register a new user account with one verification code delivered by email, SMS, or WhatsApp.
+ * Register a new user account with one verification code delivered by email.
  */
 router.post('/signup', async (req, res) => {
   try {
-    const { name, email, password, role = 'student', year, certificate, studentId, indexNumber, staffId, phone, designation, courses, deliveryChannel } = req.body;
+    const { name, email, password, role = 'student', year, certificate, studentId, indexNumber, staffId, phone, designation, courses } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({ error: 'Name, email, and password are required.' });
     }
 
     const formattedPhone = phone ? phone.trim() : null;
-    if (!formattedPhone) {
-      return res.status(400).json({ error: 'Mobile phone number is required for account verification.' });
-    }
     try {
-      assertDeliveryConfigured(getDeliveryChannel(deliveryChannel));
+      assertEmailDeliveryConfigured();
     } catch (error) {
       return res.status(503).json({ error: error.message });
     }
@@ -114,12 +95,10 @@ router.post('/signup', async (req, res) => {
     }
 
     // Check if phone already exists
-    const phoneTerms = getPhoneLookupTerms(formattedPhone);
-    const existingPhone = await prisma.user.findFirst({
-      where: { OR: phoneTerms.map(value => ({ phone: { contains: value } })) }
-    });
-    if (existingPhone) {
-      return res.status(409).json({ error: 'This mobile number is already registered to an account.' });
+    if (formattedPhone) {
+      const phoneTerms = getPhoneLookupTerms(formattedPhone);
+      const existingPhone = await prisma.user.findFirst({ where: { OR: phoneTerms.map(value => ({ phone: { contains: value } })) } });
+      if (existingPhone) return res.status(409).json({ error: 'This mobile number is already registered to an account.' });
     }
 
     // Hash password
@@ -150,7 +129,7 @@ router.post('/signup', async (req, res) => {
 
     const user = await prisma.user.create({ data: userData });
 
-    const deliveredTo = await sendOtp(user, verificationCode, deliveryChannel);
+    const deliveredTo = await sendOtp(user, verificationCode);
 
     res.status(201).json({
       success: true,
@@ -183,14 +162,13 @@ const findIdentity = (identifier) => {
 
 router.post('/request-verification', async (req, res) => {
   try {
-    const { identifier, deliveryChannel } = req.body;
+    const { identifier } = req.body;
     if (!identifier) return res.status(400).json({ error: 'Enter your TTU email, mobile number, index number, or staff ID.' });
 
     const user = await findIdentity(identifier);
     if (!user) return res.status(404).json({ error: 'No account or preloaded identity was found for this detail.' });
-    if (['sms', 'whatsapp'].includes(getDeliveryChannel(deliveryChannel)) && !user.phone) return res.status(400).json({ error: 'This account has no registered mobile number. Contact the department administrator.' });
     try {
-      assertDeliveryConfigured(getDeliveryChannel(deliveryChannel));
+      assertEmailDeliveryConfigured();
     } catch (error) {
       return res.status(503).json({ error: error.message });
     }
@@ -207,7 +185,7 @@ router.post('/request-verification', async (req, res) => {
       }
     });
 
-    const deliveredTo = await sendOtp(user, verificationCode, deliveryChannel);
+    const deliveredTo = await sendOtp(user, verificationCode);
 
     res.json({
       success: true,

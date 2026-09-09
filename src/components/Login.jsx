@@ -19,7 +19,6 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [activationIdentifier, setActivationIdentifier] = useState('');
   const [activationCode, setActivationCode] = useState('');
-  const [deliveryChannel, setDeliveryChannel] = useState('email');
   const [resendSeconds, setResendSeconds] = useState(0);
   const [activationPassword, setActivationPassword] = useState('');
   const [codeRequested, setCodeRequested] = useState(false);
@@ -88,20 +87,12 @@ export default function Login() {
       return;
     }
 
-    if (!regPhone.trim()) {
-      setError('Mobile phone number is required for account verification.');
-      return;
-    }
-
     if (regPassword.length < 6) {
       setError('Password must be at least 6 characters.');
       return;
     }
 
-    const extraFields = {
-      phone: regPhone.trim(),
-      deliveryChannel
-    };
+    const extraFields = { phone: regPhone.trim() };
 
     if (regRole === 'student') {
       extraFields.year = regYear;
@@ -161,7 +152,7 @@ export default function Login() {
     }
     setIsSubmitting(true);
     try {
-      const result = await requestVerification(activationIdentifier, deliveryChannel);
+      const result = await requestVerification(activationIdentifier);
       if (!result.success) setError(result.message);
       else {
         setCodeRequested(true);
@@ -239,14 +230,6 @@ export default function Login() {
                 <label htmlFor="activationIdentifier">TTU Email, Registered Staff Mobile Number, Index Number, or Lecturer ID</label>
                 <input id="activationIdentifier" value={activationIdentifier} onChange={(e) => setActivationIdentifier(e.target.value)} placeholder="e.g. 0241234567, 0420210088, or LEC-0492" required />
               </div>
-              <div className="form-group">
-                <label htmlFor="deliveryChannel">Send Verification Code By</label>
-                <select id="deliveryChannel" value={deliveryChannel} onChange={(e) => setDeliveryChannel(e.target.value)}>
-                  <option value="email">Registered Email</option>
-                  <option value="sms">Registered Mobile Number</option>
-                  <option value="whatsapp">Registered WhatsApp Number</option>
-                </select>
-              </div>
               {!codeRequested ? (
                 <button type="button" className="btn btn-primary w-full mt-2" disabled={isSubmitting} onClick={handleRequestVerification}>Send Verification Code</button>
               ) : (
@@ -277,15 +260,6 @@ export default function Login() {
                   required
                 />
               </div>
-              <div className="form-group">
-                <label htmlFor="signupDeliveryChannel">Send First Verification Code By</label>
-                <select id="signupDeliveryChannel" value={deliveryChannel} onChange={(e) => setDeliveryChannel(e.target.value)}>
-                  <option value="email">Registered Email</option>
-                  <option value="sms">Registered Mobile Number</option>
-                  <option value="whatsapp">Registered WhatsApp Number</option>
-                </select>
-              </div>
-
               <div className="form-group">
                 <label htmlFor="password">Password</label>
                 <input
@@ -365,7 +339,7 @@ export default function Login() {
               {/* MOBILE PHONE NUMBER FIELD */}
               <div className="form-group">
                 <label htmlFor="regPhone">
-                  Mobile Phone Number (Required for Verification)
+                  Mobile Phone Number (Optional)
                 </label>
                 <input
                   type="tel"
@@ -373,7 +347,6 @@ export default function Login() {
                   placeholder="e.g. 0241234567 or +233241234567"
                   value={regPhone}
                   onChange={(e) => setRegPhone(e.target.value)}
-                  required
                 />
               </div>
 

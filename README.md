@@ -12,23 +12,17 @@ This project is being prepared to use Supabase for authentication, database stor
 6. For an existing Supabase project, also run `supabase/migrations/003_profile_signup_details.sql` so new portal accounts appear with their role request, year, index number, staff ID, and course details.
 7. Run `supabase/migrations/006_dual_verification.sql` to add dual-verification profile fields for existing projects.
 
-## Email and phone verification
+## Email verification
 
-The Express API stores password and verification hashes in the database, while the Supabase project can provide the PostgreSQL database through `DATABASE_URL`. Configure the backend email and SMS senders before deploying:
+The Express API stores password and verification hashes in the database, while the Supabase project can provide the PostgreSQL database through `DATABASE_URL`. Configure one SMTP email sender before deploying:
 
 ```env
 SMTP_HOST=your-smtp-host
 SMTP_USER=your-smtp-user
 SMTP_PASS=your-smtp-password
-TWILIO_ACCOUNT_SID=your-twilio-account-sid
-TWILIO_AUTH_TOKEN=your-twilio-auth-token
-TWILIO_FROM_NUMBER=+12345678900
-TWILIO_WHATSAPP_FROM=whatsapp:+14155238886
 ```
 
-The portal stores a single hashed OTP in the database and never returns the code in an API response or portal screen. A user selects email, SMS, or WhatsApp as the delivery channel, then enters that one code to activate the account. Resending creates a new OTP and invalidates the earlier one.
-
-For WhatsApp testing, use Twilio's Sandbox sender and have each test recipient join the Sandbox. Production WhatsApp delivery requires an approved WhatsApp Business sender and authentication template.
+The portal stores a single hashed OTP in the database and never returns the code in an API response or portal screen. The OTP is sent to the registered email address. Resending creates a new OTP and invalidates the earlier one.
 
 Public users may request a lecturer or administrator account, but the department should approve elevated access by changing the profile role in Supabase.
 
