@@ -1,4 +1,4 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import { DbContext } from '../context/DbContextDefinition';
 import './Login.css';
 import ttuLogo from '../ttu-logo.png.png';
@@ -20,6 +20,7 @@ export default function Login() {
   const [activationIdentifier, setActivationIdentifier] = useState('');
   const [activationCode, setActivationCode] = useState('');
   const [deliveryChannel, setDeliveryChannel] = useState('email');
+  const [resendSeconds, setResendSeconds] = useState(0);
   const [activationPassword, setActivationPassword] = useState('');
   const [codeRequested, setCodeRequested] = useState(false);
 
@@ -29,6 +30,12 @@ export default function Login() {
   const [regPassword, setRegPassword] = useState('');
   const [regRole, setRegRole] = useState('student');
   const [regPhone, setRegPhone] = useState('');
+
+  useEffect(() => {
+    if (resendSeconds <= 0) return undefined;
+    const timer = window.setTimeout(() => setResendSeconds(seconds => seconds - 1), 1000);
+    return () => window.clearTimeout(timer);
+  }, [resendSeconds]);
 
   // Student extra fields
   const [regYear, setRegYear] = useState('Year 1');
@@ -92,7 +99,8 @@ export default function Login() {
     }
 
     const extraFields = {
-      phone: regPhone.trim()
+      phone: regPhone.trim(),
+      deliveryChannel
     };
 
     if (regRole === 'student') {
@@ -117,6 +125,7 @@ export default function Login() {
         setSuccessMsg(result.message);
         setActivationIdentifier(regPhone.trim() || regEmail.trim());
         setCodeRequested(true);
+        setResendSeconds(60);
         setIsSignUp(false);
         setIsActivating(true);
       } else if (result.message) {
@@ -139,9 +148,11 @@ export default function Login() {
     setError('');
     setSuccessMsg('');
     setCodeRequested(false);
+    setResendSeconds(0);
   };
 
   const handleRequestVerification = async () => {
+    if (resendSeconds > 0) return;
     setError('');
     setSuccessMsg('');
     if (!activationIdentifier.trim()) {
@@ -154,6 +165,7 @@ export default function Login() {
       if (!result.success) setError(result.message);
       else {
         setCodeRequested(true);
+        setResendSeconds(60);
         setSuccessMsg(result.message);
       }
     } finally {
@@ -232,6 +244,7 @@ export default function Login() {
                 <select id="deliveryChannel" value={deliveryChannel} onChange={(e) => setDeliveryChannel(e.target.value)}>
                   <option value="email">Registered Email</option>
                   <option value="sms">Registered Mobile Number</option>
+                  <option value="whatsapp">Registered WhatsApp Number</option>
                 </select>
               </div>
               {!codeRequested ? (
@@ -239,6 +252,7 @@ export default function Login() {
               ) : (
                 <>
                   <div className="form-group"><label htmlFor="activationCode">Verification Code</label><input id="activationCode" inputMode="numeric" value={activationCode} onChange={(e) => setActivationCode(e.target.value)} placeholder="6-digit verification code" required /></div>
+                  <button type="button" className="btn btn-secondary w-full" disabled={isSubmitting || resendSeconds > 0} onClick={handleRequestVerification}>{resendSeconds > 0 ? `Resend Verification Code in ${resendSeconds}s` : 'Resend Verification Code'}</button>
                   <div className="form-group"><label htmlFor="activationPassword">Create / Change Password</label><input id="activationPassword" type="password" value={activationPassword} onChange={(e) => setActivationPassword(e.target.value)} placeholder="At least 6 characters" required /></div>
                   <button type="submit" className="btn btn-accent w-full mt-2" disabled={isSubmitting}>{isSubmitting ? 'Verifying...' : 'Verify Code & Set Password'}</button>
                 </>
@@ -262,6 +276,14 @@ export default function Login() {
                   onChange={(e) => setEmail(e.target.value)}
                   required
                 />
+              </div>
+              <div className="form-group">
+                <label htmlFor="signupDeliveryChannel">Send First Verification Code By</label>
+                <select id="signupDeliveryChannel" value={deliveryChannel} onChange={(e) => setDeliveryChannel(e.target.value)}>
+                  <option value="email">Registered Email</option>
+                  <option value="sms">Registered Mobile Number</option>
+                  <option value="whatsapp">Registered WhatsApp Number</option>
+                </select>
               </div>
 
               <div className="form-group">

@@ -23,9 +23,12 @@ SMTP_PASS=your-smtp-password
 TWILIO_ACCOUNT_SID=your-twilio-account-sid
 TWILIO_AUTH_TOKEN=your-twilio-auth-token
 TWILIO_FROM_NUMBER=+12345678900
+TWILIO_WHATSAPP_FROM=whatsapp:+14155238886
 ```
 
-The portal stores a single hashed OTP in the database and never returns the code in an API response or portal screen. A user selects email or SMS as the delivery channel, then enters that one code to activate the account.
+The portal stores a single hashed OTP in the database and never returns the code in an API response or portal screen. A user selects email, SMS, or WhatsApp as the delivery channel, then enters that one code to activate the account. Resending creates a new OTP and invalidates the earlier one.
+
+For WhatsApp testing, use Twilio's Sandbox sender and have each test recipient join the Sandbox. Production WhatsApp delivery requires an approved WhatsApp Business sender and authentication template.
 
 Public users may request a lecturer or administrator account, but the department should approve elevated access by changing the profile role in Supabase.
 
