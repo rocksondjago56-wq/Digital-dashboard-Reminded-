@@ -3,14 +3,14 @@ import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { authenticate } from '../middleware/auth.js';
-import { isEmailDeliveryConfigured, sendVerificationEmail } from '../services/email.js';
+import { getEmailDeliverySetupError, isEmailDeliveryConfigured, sendVerificationEmail } from '../services/email.js';
 
 const router = Router();
 const prisma = new PrismaClient();
 
 const assertEmailDeliveryConfigured = () => {
   if (!isEmailDeliveryConfigured()) {
-    throw new Error('Verification delivery is temporarily unavailable. Contact the department administrator.');
+    throw new Error(getEmailDeliverySetupError());
   }
 };
 
@@ -193,14 +193,14 @@ router.post('/request-verification', async (req, res) => {
     });
   } catch (error) {
     console.error('Request verification error:', error);
-    res.status(500).json({ error: 'Could not send the verification code.' });
+    res.status(502).json({ error: error.message || 'Could not send the verification code.' });
   }
 });
 
 router.post('/activate-account', async (req, res) => {
   try {
     const { identifier, code, password } = req.body;
-    if (!identifier) return res.status(400).json({ error: 'Email or phone number identifier is required.' });
+    if (!identifier) return res.status(400).json({ error: 'Email address is required.' });
     if (!password || password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters.' });
 
     const user = await findIdentity(identifier);

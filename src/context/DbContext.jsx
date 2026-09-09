@@ -559,7 +559,7 @@ export const DbProvider = ({ children }) => {
       const expectedPassword = user.password || `${user.role}123`;
       if (password === expectedPassword) {
         if (!user.isVerified) {
-          return { success: false, message: 'Account verification is required. Verify your email and phone codes before signing in.', requiresVerification: true };
+          return { success: false, message: 'Account verification is required. Verify the code sent to your email before signing in.', requiresVerification: true };
         }
         const updatedUsers = [
           ...accountRecords.filter(u => u.email?.toLowerCase() !== user.email.toLowerCase()),
@@ -605,7 +605,6 @@ export const DbProvider = ({ children }) => {
 
     // localStorage Mode (original logic)
     const emailLower = email.trim().toLowerCase();
-    if (!extraFields.phone?.trim()) return { success: false, message: 'Mobile phone number is required for account verification.' };
     const savedUsers = getSavedUsers();
     const accountRecords = savedUsers || users;
 

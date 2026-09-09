@@ -114,7 +114,7 @@ export default function Login() {
         setError(result.message);
       } else if (result.requiresVerification) {
         setSuccessMsg(result.message);
-        setActivationIdentifier(regPhone.trim() || regEmail.trim());
+        setActivationIdentifier(regEmail.trim());
         setCodeRequested(true);
         setResendSeconds(60);
         setIsSignUp(false);
@@ -147,7 +147,7 @@ export default function Login() {
     setError('');
     setSuccessMsg('');
     if (!activationIdentifier.trim()) {
-      setError('Enter your TTU email, mobile number, index number, or staff ID.');
+      setError('Enter the email address you used to sign up.');
       return;
     }
     setIsSubmitting(true);
@@ -227,8 +227,8 @@ export default function Login() {
           <>
             <form onSubmit={handleActivateAccount} className="login-form">
               <div className="form-group">
-                <label htmlFor="activationIdentifier">TTU Email, Registered Staff Mobile Number, Index Number, or Lecturer ID</label>
-                <input id="activationIdentifier" value={activationIdentifier} onChange={(e) => setActivationIdentifier(e.target.value)} placeholder="e.g. 0241234567, 0420210088, or LEC-0492" required />
+                <label htmlFor="activationIdentifier">Registered Email Address</label>
+                <input id="activationIdentifier" type="email" value={activationIdentifier} onChange={(e) => setActivationIdentifier(e.target.value)} placeholder="you@ttu.edu.gh" required />
               </div>
               {!codeRequested ? (
                 <button type="button" className="btn btn-primary w-full mt-2" disabled={isSubmitting} onClick={handleRequestVerification}>Send Verification Code</button>

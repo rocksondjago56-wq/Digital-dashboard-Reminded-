@@ -1,0 +1,10 @@
+# Private records and local-only backend files must never be uploaded with the frontend.
+server/
+data/
+*.xlsx
+*.xls
+*.CR2
+*.cr2
+src/Screenshot*.png
+.env
+.env.local

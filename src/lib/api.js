@@ -6,7 +6,7 @@
  * and the app will fall back to localStorage mode.
  */
 
-const API_BASE = 'http://localhost:3001/api';
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3001/api';
 const TOKEN_KEY = 'ttu_api_token';
 
 /**
