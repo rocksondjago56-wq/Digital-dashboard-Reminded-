@@ -595,14 +595,7 @@ export const DbProvider = ({ children }) => {
             setCurrentUser(result.user);
           }
           addNotification(`New user registered: ${result.user?.name || name} (${role})`);
-          return {
-            success: true,
-            user: result.user,
-            message: result.message,
-            developmentEmailCode: result.developmentEmailCode,
-            developmentPhoneCode: result.developmentPhoneCode,
-            requiresVerification: result.requiresVerification
-          };
+          return { success: true, user: result.user, message: result.message, requiresVerification: result.requiresVerification };
         }
         return { success: false, message: result.error || 'Signup failed.' };
       } catch (error) {
@@ -621,8 +614,7 @@ export const DbProvider = ({ children }) => {
       return { success: false, message: 'This email is already registered. Use Sign In instead.' };
     }
 
-    const emailVerificationCode = String(Math.floor(100000 + Math.random() * 900000));
-    const phoneVerificationCode = String(Math.floor(100000 + Math.random() * 900000));
+    const verificationCode = String(Math.floor(100000 + Math.random() * 900000));
     const newUser = {
       id: `u_${Date.now()}`,
       name: name.trim(),
@@ -632,10 +624,7 @@ export const DbProvider = ({ children }) => {
       department: 'Graphic Design',
       ...extraFields,
       isVerified: false,
-      emailVerified: false,
-      phoneVerified: false,
-      emailVerificationCode,
-      phoneVerificationCode,
+      verificationCode,
       completedDeadlines: (role === 'student' || role === 'student_head') ? [] : undefined,
       year: extraFields.year || (role === 'student' || role === 'student_head' ? 'Year 1' : undefined),
       certificate: extraFields.certificate || (role === 'student' || role === 'student_head' ? 'BTech' : undefined),
@@ -650,16 +639,14 @@ export const DbProvider = ({ children }) => {
       success: true,
       user: newUser,
       requiresVerification: true,
-      message: 'Account created. Enter both development codes to finish verification.',
-      developmentEmailCode: emailVerificationCode,
-      developmentPhoneCode: phoneVerificationCode
+      message: 'Account created. Request a verification code to finish activation.'
     };
   };
 
-  const requestVerification = async (identifier) => {
+  const requestVerification = async (identifier, deliveryChannel = 'email') => {
     if (useApi) {
       try {
-        return await api.auth.requestVerification(identifier);
+        return await api.auth.requestVerification(identifier, deliveryChannel);
       } catch (error) {
         return { success: false, message: error.message };
       }
@@ -669,24 +656,20 @@ export const DbProvider = ({ children }) => {
       [item.email, item.studentId, item.staffId].filter(Boolean).some(value => value.toLowerCase() === term) || matchesPhone(item.phone, term)
     );
     if (!user) return { success: false, message: 'No account or preloaded identity was found.' };
-    const emailCode = String(Math.floor(100000 + Math.random() * 900000));
-    const phoneCode = String(Math.floor(100000 + Math.random() * 900000));
+    const verificationCode = String(Math.floor(100000 + Math.random() * 900000));
     const accountRecords = getSavedUsers() || users;
-    const updated = accountRecords.map(item => item.id === user.id ? { ...item, emailVerificationCode: emailCode, phoneVerificationCode: phoneCode, verificationCode: emailCode, isVerified: false, emailVerified: false, phoneVerified: false } : item);
+    const updated = accountRecords.map(item => item.id === user.id ? { ...item, verificationCode, isVerified: false } : item);
     syncUsers(updated);
     return {
       success: true,
-      message: `Verification codes generated for ${user.name}: Email (${user.email}) and Mobile (${user.phone || 'phone'}).`,
-      developmentEmailCode: emailCode,
-      developmentPhoneCode: phoneCode,
-      developmentCode: `Email Code: ${emailCode} | Phone Code: ${phoneCode}`
+      message: `A verification code was sent to the registered ${deliveryChannel === 'sms' ? 'mobile number' : 'email address'}.`
     };
   };
 
-  const activateAccount = async (identifier, emailCode, phoneCode, password) => {
+  const activateAccount = async (identifier, code, password) => {
     if (useApi) {
       try {
-        return await api.auth.activateAccount(identifier, emailCode, phoneCode, password);
+        return await api.auth.activateAccount(identifier, code, password);
       } catch (error) {
         return { success: false, message: error.message };
       }
@@ -698,26 +681,13 @@ export const DbProvider = ({ children }) => {
     );
 
     if (!user) return { success: false, message: 'Account not found.' };
+    if (!password || password.length < 6) return { success: false, message: 'Password must be at least 6 characters.' };
 
-    const expectedEmailCode = user.emailVerificationCode || user.verificationCode;
-    const expectedPhoneCode = user.phoneVerificationCode || user.verificationCode;
+    if (!code?.trim() || code.trim() !== user.verificationCode) return { success: false, message: 'The verification code is incorrect.' };
 
-    const inputEmail = emailCode ? emailCode.trim() : '';
-    const inputPhone = phoneCode ? phoneCode.trim() : '';
-
-    if (inputEmail !== expectedEmailCode && inputPhone !== expectedPhoneCode) {
-      return { success: false, message: 'Both Email Code and Phone Code are incorrect.' };
-    }
-    if (inputEmail !== expectedEmailCode) {
-      return { success: false, message: 'The Email Verification Code is incorrect.' };
-    }
-    if (inputPhone !== expectedPhoneCode) {
-      return { success: false, message: 'The Phone Verification Code is incorrect.' };
-    }
-
-    const updatedUsers = accountRecords.map(item => item.id === user.id ? { ...item, ...(password ? { password } : {}), isVerified: true, emailVerified: true, phoneVerified: true, emailVerificationCode: undefined, phoneVerificationCode: undefined, verificationCode: undefined } : item);
+    const updatedUsers = accountRecords.map(item => item.id === user.id ? { ...item, ...(password ? { password } : {}), isVerified: true, verificationCode: undefined } : item);
     syncUsers(updatedUsers);
-    return { success: true, message: `Account dual verification complete for ${user.name}! You can now sign in.` };
+    return { success: true, message: `Account verified for ${user.name}. You can now sign in.` };
   };
 
   const logout = async () => {
@@ -1158,7 +1128,7 @@ export const DbProvider = ({ children }) => {
       designation: identity.role === 'admin' ? identity.designation || 'Department Administrator' : undefined
     };
     syncUsers([...existingUsers, user]);
-    return { success: true, user, message: 'Identity provisioned.', developmentCode: code };
+    return { success: true, user, message: 'Identity provisioned.' };
   };
 
   const provisionIdentities = async (identities, onProgress) => {

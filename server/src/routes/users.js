@@ -114,8 +114,7 @@ router.post('/provision', authenticate, requireAdmin(), async (req, res) => {
     res.status(201).json({
       success: true,
       user: { id: user.id, name: user.name, email: user.email, role: user.role, isVerified: user.isVerified },
-      message: delivery.delivered ? 'Identity provisioned and verification email sent.' : 'Identity provisioned. Configure SMTP to send verification emails.',
-      developmentCode: delivery.developmentCode
+      message: delivery.delivered ? 'Identity provisioned and verification email sent.' : 'Identity provisioned. Configure SMTP to send verification emails.'
     });
   } catch (error) {
     console.error('Provision identity error:', error);

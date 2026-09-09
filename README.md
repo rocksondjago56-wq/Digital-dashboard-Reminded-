@@ -25,7 +25,7 @@ TWILIO_AUTH_TOKEN=your-twilio-auth-token
 TWILIO_FROM_NUMBER=+12345678900
 ```
 
-In development only, codes are returned to the app when delivery credentials are unavailable. Production never returns verification codes in API responses. Users must verify both the email code and SMS code before sign-in.
+The portal stores a single hashed OTP in the database and never returns the code in an API response or portal screen. A user selects email or SMS as the delivery channel, then enters that one code to activate the account.
 
 Public users may request a lecturer or administrator account, but the department should approve elevated access by changing the profile role in Supabase.
 

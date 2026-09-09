@@ -106,7 +106,7 @@ export default function AdminDashboard() {
       setIdentityError(result?.message || 'Could not provision this identity.');
       return;
     }
-    setIdentityStatus(`${result.user.email} provisioned.${result.developmentCode ? ` Development code: ${result.developmentCode}` : ''}`);
+    setIdentityStatus(`${result.user.email} provisioned.`);
     setIdentityName('');
     setIdentityIndex('');
     setIdentityStaffId('');

@@ -119,11 +119,7 @@ async function initDatabase() {
     `ALTER TABLE "announcements" ADD COLUMN IF NOT EXISTS "certificate" TEXT NOT NULL DEFAULT 'All Certificates';`,
     `ALTER TABLE "announcements" ADD COLUMN IF NOT EXISTS "year" TEXT NOT NULL DEFAULT 'All Years';`,
     `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "is_verified" BOOLEAN NOT NULL DEFAULT false;`,
-    `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "email_verified" BOOLEAN NOT NULL DEFAULT false;`,
-    `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "phone_verified" BOOLEAN NOT NULL DEFAULT false;`,
     `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "verification_code_hash" TEXT;`,
-    `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "email_code_hash" TEXT;`,
-    `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "phone_code_hash" TEXT;`,
     `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "verification_expires_at" TIMESTAMPTZ;`,
     `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "phone" TEXT UNIQUE;`
   ];

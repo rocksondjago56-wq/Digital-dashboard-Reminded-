@@ -21,11 +21,7 @@ create table public.profiles (
   phone text unique,
   profile_picture_url text,
   is_verified boolean not null default false,
-  email_verified boolean not null default false,
-  phone_verified boolean not null default false,
   verification_code_hash text,
-  email_code_hash text,
-  phone_code_hash text,
   verification_expires_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -102,9 +98,7 @@ begin
     courses,
     requested_role,
     requested_courses,
-    is_verified,
-    email_verified,
-    phone_verified
+    is_verified
   )
   values (
     new.id,
@@ -126,9 +120,7 @@ begin
       else 'student'
     end,
     requested_courses,
-    coalesce((new.raw_user_meta_data ->> 'is_verified')::boolean, false),
-    coalesce((new.raw_user_meta_data ->> 'email_verified')::boolean, false),
-    coalesce((new.raw_user_meta_data ->> 'phone_verified')::boolean, false)
+    coalesce((new.raw_user_meta_data ->> 'is_verified')::boolean, false)
   );
   return new;
 end;

@@ -18,12 +18,10 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [activationIdentifier, setActivationIdentifier] = useState('');
-  const [activationEmailCode, setActivationEmailCode] = useState('');
-  const [activationPhoneCode, setActivationPhoneCode] = useState('');
+  const [activationCode, setActivationCode] = useState('');
+  const [deliveryChannel, setDeliveryChannel] = useState('email');
   const [activationPassword, setActivationPassword] = useState('');
   const [codeRequested, setCodeRequested] = useState(false);
-  const [developmentEmailCode, setDevelopmentEmailCode] = useState('');
-  const [developmentPhoneCode, setDevelopmentPhoneCode] = useState('');
 
   // Sign Up State
   const [regName, setRegName] = useState('');
@@ -118,8 +116,6 @@ export default function Login() {
       } else if (result.requiresVerification) {
         setSuccessMsg(result.message);
         setActivationIdentifier(regPhone.trim() || regEmail.trim());
-        setDevelopmentEmailCode(result.developmentEmailCode || '');
-        setDevelopmentPhoneCode(result.developmentPhoneCode || '');
         setCodeRequested(true);
         setIsSignUp(false);
         setIsActivating(true);
@@ -143,8 +139,6 @@ export default function Login() {
     setError('');
     setSuccessMsg('');
     setCodeRequested(false);
-    setDevelopmentEmailCode('');
-    setDevelopmentPhoneCode('');
   };
 
   const handleRequestVerification = async () => {
@@ -156,12 +150,10 @@ export default function Login() {
     }
     setIsSubmitting(true);
     try {
-      const result = await requestVerification(activationIdentifier);
+      const result = await requestVerification(activationIdentifier, deliveryChannel);
       if (!result.success) setError(result.message);
       else {
         setCodeRequested(true);
-        setDevelopmentEmailCode(result.developmentEmailCode || '');
-        setDevelopmentPhoneCode(result.developmentPhoneCode || '');
         setSuccessMsg(result.message);
       }
     } finally {
@@ -175,13 +167,12 @@ export default function Login() {
     setSuccessMsg('');
     setIsSubmitting(true);
     try {
-      const result = await activateAccount(activationIdentifier, activationEmailCode, activationPhoneCode, activationPassword);
+      const result = await activateAccount(activationIdentifier, activationCode, activationPassword);
       if (!result.success) setError(result.message);
       else {
         setSuccessMsg(result.message);
         setIsActivating(false);
-        setActivationEmailCode('');
-        setActivationPhoneCode('');
+        setActivationCode('');
         setActivationPassword('');
       }
     } finally {
@@ -236,16 +227,20 @@ export default function Login() {
                 <label htmlFor="activationIdentifier">TTU Email, Registered Staff Mobile Number, Index Number, or Lecturer ID</label>
                 <input id="activationIdentifier" value={activationIdentifier} onChange={(e) => setActivationIdentifier(e.target.value)} placeholder="e.g. 0241234567, 0420210088, or LEC-0492" required />
               </div>
+              <div className="form-group">
+                <label htmlFor="deliveryChannel">Send Verification Code By</label>
+                <select id="deliveryChannel" value={deliveryChannel} onChange={(e) => setDeliveryChannel(e.target.value)}>
+                  <option value="email">Registered Email</option>
+                  <option value="sms">Registered Mobile Number</option>
+                </select>
+              </div>
               {!codeRequested ? (
-                <button type="button" className="btn btn-primary w-full mt-2" disabled={isSubmitting} onClick={handleRequestVerification}>Send Email and Phone Codes</button>
+                <button type="button" className="btn btn-primary w-full mt-2" disabled={isSubmitting} onClick={handleRequestVerification}>Send Verification Code</button>
               ) : (
                 <>
-                  <div className="form-group"><label htmlFor="activationEmailCode">Email Verification Code</label><input id="activationEmailCode" inputMode="numeric" value={activationEmailCode} onChange={(e) => setActivationEmailCode(e.target.value)} placeholder="6-digit code from email" required /></div>
-                  <div className="form-group"><label htmlFor="activationPhoneCode">Phone Verification Code</label><input id="activationPhoneCode" inputMode="numeric" value={activationPhoneCode} onChange={(e) => setActivationPhoneCode(e.target.value)} placeholder="6-digit code from SMS" required /></div>
+                  <div className="form-group"><label htmlFor="activationCode">Verification Code</label><input id="activationCode" inputMode="numeric" value={activationCode} onChange={(e) => setActivationCode(e.target.value)} placeholder="6-digit verification code" required /></div>
                   <div className="form-group"><label htmlFor="activationPassword">Create / Change Password</label><input id="activationPassword" type="password" value={activationPassword} onChange={(e) => setActivationPassword(e.target.value)} placeholder="At least 6 characters" required /></div>
-                  {developmentEmailCode && <p className="development-code">Development email code: {developmentEmailCode}</p>}
-                  {developmentPhoneCode && <p className="development-code">Development phone code: {developmentPhoneCode}</p>}
-                  <button type="submit" className="btn btn-accent w-full mt-2" disabled={isSubmitting}>{isSubmitting ? 'Verifying...' : 'Verify Both Codes & Set Password'}</button>
+                  <button type="submit" className="btn btn-accent w-full mt-2" disabled={isSubmitting}>{isSubmitting ? 'Verifying...' : 'Verify Code & Set Password'}</button>
                 </>
               )}
             </form>

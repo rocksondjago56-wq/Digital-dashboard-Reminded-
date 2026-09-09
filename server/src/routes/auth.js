@@ -8,7 +8,25 @@ import { isSmsDeliveryConfigured, sendVerificationSMS } from '../services/sms.js
 
 const router = Router();
 const prisma = new PrismaClient();
-const isProduction = process.env.NODE_ENV === 'production';
+
+const getDeliveryChannel = (channel) => (channel === 'sms' ? 'sms' : 'email');
+
+const assertDeliveryConfigured = (channel) => {
+  if ((channel === 'email' && !isEmailDeliveryConfigured()) || (channel === 'sms' && !isSmsDeliveryConfigured())) {
+    throw new Error('Verification delivery is temporarily unavailable. Contact the department administrator.');
+  }
+};
+
+const sendOtp = async (user, code, requestedChannel) => {
+  const channel = getDeliveryChannel(requestedChannel);
+  assertDeliveryConfigured(channel);
+  if (channel === 'sms') {
+    await sendVerificationSMS({ to: user.phone, name: user.name, code });
+    return 'mobile number';
+  }
+  await sendVerificationEmail({ to: user.email, name: user.name, code });
+  return 'email address';
+};
 
 const getPhoneLookupTerms = (value) => {
   const digits = String(value || '').replace(/\D/g, '');
@@ -51,8 +69,6 @@ function formatUser(user, completedDeadlines = []) {
     courses: user.courses || [],
     profilePic: user.profilePictureUrl,
     isVerified: Boolean(user.isVerified),
-    emailVerified: Boolean(user.emailVerified),
-    phoneVerified: Boolean(user.phoneVerified),
     completedDeadlines
   };
 }
@@ -63,11 +79,11 @@ function formatUser(user, completedDeadlines = []) {
  */
 /**
  * POST /api/auth/signup
- * Register a new user account with mandatory dual verification (Email & Phone).
+ * Register a new user account with one verification code delivered by email or SMS.
  */
 router.post('/signup', async (req, res) => {
   try {
-    const { name, email, password, role = 'student', year, certificate, studentId, indexNumber, staffId, phone, designation, courses } = req.body;
+    const { name, email, password, role = 'student', year, certificate, studentId, indexNumber, staffId, phone, designation, courses, deliveryChannel } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({ error: 'Name, email, and password are required.' });
@@ -77,8 +93,10 @@ router.post('/signup', async (req, res) => {
     if (!formattedPhone) {
       return res.status(400).json({ error: 'Mobile phone number is required for account verification.' });
     }
-    if (isProduction && (!isEmailDeliveryConfigured() || !isSmsDeliveryConfigured())) {
-      return res.status(503).json({ error: 'Account verification is temporarily unavailable. Contact the department administrator.' });
+    try {
+      assertDeliveryConfigured(getDeliveryChannel(deliveryChannel));
+    } catch (error) {
+      return res.status(503).json({ error: error.message });
     }
 
     // Check if email already exists
@@ -99,13 +117,8 @@ router.post('/signup', async (req, res) => {
     // Hash password
     const passwordHash = await bcrypt.hash(password, 12);
 
-    // Generate dual verification codes (Email Code and Phone Code)
-    const emailCode = String(Math.floor(100000 + Math.random() * 900000));
-    const phoneCode = String(Math.floor(100000 + Math.random() * 900000));
-
-    const emailCodeHash = await bcrypt.hash(emailCode, 10);
-    const phoneCodeHash = await bcrypt.hash(phoneCode, 10);
-    const verificationCodeHash = await bcrypt.hash(emailCode, 10);
+    const verificationCode = String(Math.floor(100000 + Math.random() * 900000));
+    const verificationCodeHash = await bcrypt.hash(verificationCode, 10);
     const verificationExpiresAt = new Date(Date.now() + 15 * 60 * 1000);
 
     // Build user data
@@ -123,28 +136,19 @@ router.post('/signup', async (req, res) => {
       designation: designation || (role === 'admin' ? 'Department Administrator' : null),
       courses: Array.isArray(courses) ? courses : (typeof courses === 'string' ? courses.split(',').map(c => c.trim()).filter(Boolean) : role === 'lecturer' ? ['General Design'] : []),
       isVerified: false,
-      emailVerified: false,
-      phoneVerified: false,
-      emailCodeHash,
-      phoneCodeHash,
       verificationCodeHash,
       verificationExpiresAt
     };
 
     const user = await prisma.user.create({ data: userData });
-    const token = generateToken(user);
 
-    // Dispatch verification codes to both Email and Phone
-    const emailRes = await sendVerificationEmail({ to: user.email, name: user.name, code: emailCode });
-    const smsRes = await sendVerificationSMS({ to: user.phone, name: user.name, code: phoneCode });
+    const deliveredTo = await sendOtp(user, verificationCode, deliveryChannel);
 
     res.status(201).json({
       success: true,
-      token,
       user: formatUser(user),
       requiresVerification: true,
-      ...(isProduction ? {} : { developmentEmailCode: emailRes.developmentCode, developmentPhoneCode: smsRes.developmentCode }),
-      message: `Account created successfully! Verification codes have been sent to your email (${user.email}) and phone number (${user.phone}). Please enter both codes to verify your account.`
+      message: `Account created. A verification code was sent to your registered ${deliveredTo}.`
     });
   } catch (error) {
     console.error('Signup error:', error);
@@ -171,41 +175,35 @@ const findIdentity = (identifier) => {
 
 router.post('/request-verification', async (req, res) => {
   try {
-    const { identifier } = req.body;
+    const { identifier, deliveryChannel } = req.body;
     if (!identifier) return res.status(400).json({ error: 'Enter your TTU email, mobile number, index number, or staff ID.' });
 
     const user = await findIdentity(identifier);
     if (!user) return res.status(404).json({ error: 'No account or preloaded identity was found for this detail.' });
-    if (!user.phone) return res.status(400).json({ error: 'This account has no registered mobile number. Contact the department administrator.' });
-    if (isProduction && (!isEmailDeliveryConfigured() || !isSmsDeliveryConfigured())) {
-      return res.status(503).json({ error: 'Account verification is temporarily unavailable. Contact the department administrator.' });
+    if (getDeliveryChannel(deliveryChannel) === 'sms' && !user.phone) return res.status(400).json({ error: 'This account has no registered mobile number. Contact the department administrator.' });
+    try {
+      assertDeliveryConfigured(getDeliveryChannel(deliveryChannel));
+    } catch (error) {
+      return res.status(503).json({ error: error.message });
     }
 
-    const emailCode = String(Math.floor(100000 + Math.random() * 900000));
-    const phoneCode = String(Math.floor(100000 + Math.random() * 900000));
-
-    const emailCodeHash = await bcrypt.hash(emailCode, 10);
-    const phoneCodeHash = await bcrypt.hash(phoneCode, 10);
-    const verificationCodeHash = await bcrypt.hash(emailCode, 10);
+    const verificationCode = String(Math.floor(100000 + Math.random() * 900000));
+    const verificationCodeHash = await bcrypt.hash(verificationCode, 10);
     const verificationExpiresAt = new Date(Date.now() + 15 * 60 * 1000);
 
     await prisma.user.update({
       where: { id: user.id },
       data: {
-        emailCodeHash,
-        phoneCodeHash,
         verificationCodeHash,
         verificationExpiresAt
       }
     });
 
-    const emailRes = await sendVerificationEmail({ to: user.email, name: user.name, code: emailCode });
-    const smsRes = await sendVerificationSMS({ to: user.phone, name: user.name, code: phoneCode });
+    const deliveredTo = await sendOtp(user, verificationCode, deliveryChannel);
 
     res.json({
       success: true,
-      message: `6-digit verification codes have been sent to your email (${user.email}) and phone number (${user.phone}).`,
-      ...(isProduction ? {} : { developmentEmailCode: emailRes.developmentCode, developmentPhoneCode: smsRes.developmentCode })
+      message: `A 6-digit verification code was sent to your registered ${deliveredTo}.`
     });
   } catch (error) {
     console.error('Request verification error:', error);
@@ -215,69 +213,23 @@ router.post('/request-verification', async (req, res) => {
 
 router.post('/activate-account', async (req, res) => {
   try {
-    const { identifier, emailCode, phoneCode, code, password } = req.body;
+    const { identifier, code, password } = req.body;
     if (!identifier) return res.status(400).json({ error: 'Email or phone number identifier is required.' });
     if (!password || password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters.' });
 
     const user = await findIdentity(identifier);
-    if (!user || (!user.emailCodeHash && !user.verificationCodeHash) || !user.verificationExpiresAt) {
-      return res.status(400).json({ error: 'Please request new verification codes before activating your account.' });
+    if (!user || !user.verificationCodeHash || !user.verificationExpiresAt) {
+      return res.status(400).json({ error: 'Please request a new verification code before activating your account.' });
     }
     if (user.verificationExpiresAt < new Date()) {
-      return res.status(400).json({ error: 'The verification codes have expired. Please request new codes.' });
+      return res.status(400).json({ error: 'The verification code has expired. Please request a new code.' });
     }
-
-    // Determine codes submitted
-    let inputEmailCode = emailCode ? emailCode.trim() : '';
-    let inputPhoneCode = phoneCode ? phoneCode.trim() : '';
-
-    if (!inputEmailCode && !inputPhoneCode && code) {
-      const parts = code.split(/[,|;/\s]+/);
-      if (parts.length >= 2) {
-        inputEmailCode = parts[0];
-        inputPhoneCode = parts[1];
-      } else {
-        inputEmailCode = code.trim();
-        inputPhoneCode = code.trim();
-      }
-    }
-
-    if (!inputEmailCode || !inputPhoneCode) {
-      return res.status(400).json({ error: 'Both Email Verification Code and Phone Verification Code are required.' });
-    }
-
-    // Check Email Code
-    let emailMatch = false;
-    if (user.emailCodeHash) {
-      emailMatch = await bcrypt.compare(inputEmailCode, user.emailCodeHash);
-    } else if (user.verificationCodeHash) {
-      emailMatch = await bcrypt.compare(inputEmailCode, user.verificationCodeHash);
-    }
-
-    // Check Phone Code
-    let phoneMatch = false;
-    if (user.phoneCodeHash) {
-      phoneMatch = await bcrypt.compare(inputPhoneCode, user.phoneCodeHash);
-    } else if (user.verificationCodeHash) {
-      phoneMatch = await bcrypt.compare(inputPhoneCode, user.verificationCodeHash);
-    }
-
-    if (!emailMatch && !phoneMatch) {
-      return res.status(400).json({ error: 'Both Email Code and Phone Code are incorrect.' });
-    }
-    if (!emailMatch) {
-      return res.status(400).json({ error: 'The Email Verification Code is incorrect.' });
-    }
-    if (!phoneMatch) {
-      return res.status(400).json({ error: 'The Phone Verification Code is incorrect.' });
+    if (!code?.trim() || !(await bcrypt.compare(code.trim(), user.verificationCodeHash))) {
+      return res.status(400).json({ error: 'The verification code is incorrect.' });
     }
 
     const updateData = {
       isVerified: true,
-      emailVerified: true,
-      phoneVerified: true,
-      emailCodeHash: null,
-      phoneCodeHash: null,
       verificationCodeHash: null,
       verificationExpiresAt: null
     };
@@ -291,7 +243,7 @@ router.post('/activate-account', async (req, res) => {
 
     res.json({
       success: true,
-      message: `Account dual verification complete for ${activated.name}! Your email and phone number are verified. You can now sign in.`,
+      message: `Account verified for ${activated.name}. You can now sign in.`,
       user: formatUser(activated)
     });
   } catch (error) {
@@ -303,7 +255,7 @@ router.post('/activate-account', async (req, res) => {
 /**
  * POST /api/auth/login
  * Authenticate with email, name, studentId, staffId, or mobile phone + password.
- * Blocks unverified users until dual verification is completed.
+ * Blocks unverified users until verification is completed.
  */
 router.post('/login', async (req, res) => {
   try {
@@ -343,7 +295,7 @@ router.post('/login', async (req, res) => {
     // Require dual account verification before gaining system access
     if (!user.isVerified) {
       return res.status(403).json({
-        error: 'Account verification required. Verification codes were sent to your email and phone number. Please enter both codes to gain access.',
+        error: 'Account verification required. Request a verification code to continue.',
         requiresVerification: true,
         identifier: user.email
       });
