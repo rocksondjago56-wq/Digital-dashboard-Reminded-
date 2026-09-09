@@ -153,6 +153,7 @@ const USERS_STORAGE_KEY = 'ttu_users';
 const CURRENT_USER_STORAGE_KEY = 'ttu_current_user';
 const TIMETABLE_STORAGE_KEY = 'ttu_timetable';
 const CLASS_GROUPS_STORAGE_KEY = 'ttu_class_whatsapp_groups';
+const STUDENT_ARCHIVE_STORAGE_KEY = 'ttu_student_archive';
 const DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const ALL_CERTIFICATES = 'All Certificates';
 const ALL_YEARS = 'All Years';
@@ -292,6 +293,7 @@ export const DbProvider = ({ children }) => {
   const [notifications, setNotifications] = useState([]);
   const [timetable, setTimetable] = useState([]);
   const [classGroups, setClassGroups] = useState([]);
+  const [studentArchive, setStudentArchive] = useState([]);
   const [loading, setLoading] = useState(true);
   const [useApi, setUseApi] = useState(false); // true when backend is available
 
@@ -353,6 +355,32 @@ export const DbProvider = ({ children }) => {
     setClassGroups(sorted);
     localStorage.setItem(CLASS_GROUPS_STORAGE_KEY, JSON.stringify(sorted));
   };
+
+  const getStudentArchive = (userId) => {
+    if (!userId) return [];
+    try {
+      const archive = JSON.parse(localStorage.getItem(STUDENT_ARCHIVE_STORAGE_KEY) || '{}');
+      return Array.isArray(archive[userId]) ? archive[userId] : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const syncStudentArchive = (items) => {
+    if (!currentUser?.id) return;
+    try {
+      const archive = JSON.parse(localStorage.getItem(STUDENT_ARCHIVE_STORAGE_KEY) || '{}');
+      archive[currentUser.id] = items;
+      localStorage.setItem(STUDENT_ARCHIVE_STORAGE_KEY, JSON.stringify(archive));
+    } catch {
+      localStorage.setItem(STUDENT_ARCHIVE_STORAGE_KEY, JSON.stringify({ [currentUser.id]: items }));
+    }
+    setStudentArchive(items);
+  };
+
+  useEffect(() => {
+    setStudentArchive(getStudentArchive(currentUser?.id));
+  }, [currentUser?.id]);
 
   // ─── Fetch All Remote Data (API mode) ──────────────────────────────────
 
@@ -798,6 +826,27 @@ export const DbProvider = ({ children }) => {
     syncUsers(updatedUsers);
   };
 
+  const archiveStudentWork = (work) => {
+    if (!currentUser || !['student', 'student_head'].includes(currentUser.role) || !work?.id) return;
+    if (studentArchive.some(item => item.sourceId === work.id)) return;
+
+    const archivedItem = {
+      ...work,
+      sourceId: work.id,
+      archiveId: `archive_${work.id}_${Date.now()}`,
+      archivedAt: new Date().toISOString()
+    };
+    syncStudentArchive([archivedItem, ...studentArchive]);
+    addNotification(`Moved "${work.title}" to your archive.`);
+  };
+
+  const restoreStudentWork = (archiveId) => {
+    const archivedItem = studentArchive.find(item => item.archiveId === archiveId);
+    if (!archivedItem) return;
+    syncStudentArchive(studentArchive.filter(item => item.archiveId !== archiveId));
+    addNotification(`Restored "${archivedItem.title}" to your active work.`);
+  };
+
   // ─── Events ───────────────────────────────────────────────────────────
 
   const addEvent = async (event) => {
@@ -1219,6 +1268,9 @@ export const DbProvider = ({ children }) => {
       updateDeadline,
       deleteDeadline,
       toggleDeadlineCompleted,
+      studentArchive,
+      archiveStudentWork,
+      restoreStudentWork,
       addEvent,
       updateEvent,
       deleteEvent,

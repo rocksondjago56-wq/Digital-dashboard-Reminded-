@@ -29,6 +29,9 @@ export default function StudentDashboard() {
     events,
     announcements,
     toggleDeadlineCompleted,
+    studentArchive,
+    archiveStudentWork,
+    restoreStudentWork,
     timetable,
     classGroups,
     addTimetableSlot,
@@ -37,7 +40,7 @@ export default function StudentDashboard() {
     saveClassWhatsAppGroup
   } = useContext(DbContext);
 
-  const [activeTab, setActiveTab] = useState('all'); // all, assignments, projects, exams, completed
+  const [activeTab, setActiveTab] = useState('all'); // all, assignments, projects, exams, completed, archive
   const [announcementFilter, setAnnouncementFilter] = useState('all'); // all, notice, update, calendar
   const [showTimetableForm, setShowTimetableForm] = useState(false);
   const [editingTimetableId, setEditingTimetableId] = useState(null);
@@ -101,8 +104,10 @@ export default function StudentDashboard() {
 
   // Filter deadlines
   const completedList = currentUser.completedDeadlines || [];
+  const archivedWork = studentArchive || [];
+  const archivedSourceIds = new Set(archivedWork.map(item => item.sourceId));
 
-  const visibleDeadlines = (deadlines || []).filter(d => isForCurrentStudent(d, currentUser));
+  const visibleDeadlines = (deadlines || []).filter(d => isForCurrentStudent(d, currentUser) && !archivedSourceIds.has(d.id));
   const filteredDeadlines = visibleDeadlines.filter(d => {
     const isCompleted = completedList.includes(d.id);
 
@@ -269,18 +274,33 @@ export default function StudentDashboard() {
           {/* Deadlines Section */}
           <section className="glass-panel dashboard-section mb-4">
             <div className="section-header-tabs">
-              <h2>Upcoming Deadlines</h2>
+              <h2>{activeTab === 'archive' ? 'Archive' : 'Upcoming Deadlines'}</h2>
               <div className="tabs-list">
                 <button className={`tab-btn ${activeTab === 'all' ? 'active' : ''}`} onClick={() => setActiveTab('all')}>Active</button>
                 <button className={`tab-btn ${activeTab === 'assignments' ? 'active' : ''}`} onClick={() => setActiveTab('assignments')}>Assignments</button>
                 <button className={`tab-btn ${activeTab === 'projects' ? 'active' : ''}`} onClick={() => setActiveTab('projects')}>Projects</button>
                 <button className={`tab-btn ${activeTab === 'exams' ? 'active' : ''}`} onClick={() => setActiveTab('exams')}>Exams</button>
                 <button className={`tab-btn ${activeTab === 'completed' ? 'active' : ''}`} onClick={() => setActiveTab('completed')}>Completed ({completedList.length})</button>
+                <button className={`tab-btn ${activeTab === 'archive' ? 'active' : ''}`} onClick={() => setActiveTab('archive')}>Archive ({archivedWork.length})</button>
               </div>
             </div>
 
             <div className="deadlines-list-container">
-              {filteredDeadlines.length === 0 ? (
+              {activeTab === 'archive' ? (
+                archivedWork.length === 0 ? (
+                  <div className="empty-state archive-empty-state"><span className="empty-icon">Archive</span><p>Your archive is empty. Archive a project, assignment, or document from your active work to keep it here.</p></div>
+                ) : archivedWork.map(item => (
+                  <div key={item.archiveId} className="deadline-card archive-card">
+                    <div className="deadline-body">
+                      <div className="deadline-meta-row"><span className="deadline-course">{item.course}</span><span className="target-badge">Archived {new Date(item.archivedAt).toLocaleDateString()}</span></div>
+                      <h3 className="deadline-title">{item.title}</h3>
+                      <p className="deadline-desc">{item.description}</p>
+                      {item.attachment?.dataUrl && <a className="deadline-attachment-link" href={item.attachment.dataUrl} target="_blank" rel="noopener noreferrer">Open {item.attachment.name}</a>}
+                    </div>
+                    <div className="archive-actions"><button type="button" className="btn btn-primary btn-xs" onClick={() => restoreStudentWork(item.archiveId)}>Restore</button></div>
+                  </div>
+                ))
+              ) : filteredDeadlines.length === 0 ? (
                 <div className="empty-state">
                   <span className="empty-icon">🎉</span>
                   <p>No deadlines found in this category.</p>
@@ -401,6 +421,7 @@ export default function StudentDashboard() {
                           >
                             <span>💬 Share to WhatsApp</span>
                           </button>
+                          <button type="button" className="archive-work-btn" onClick={() => archiveStudentWork(d)}>Archive</button>
                         </div>
                       </div>
 
