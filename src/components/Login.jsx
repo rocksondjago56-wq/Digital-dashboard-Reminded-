@@ -82,7 +82,7 @@ export default function Login() {
   return (
     <div className="login-container animate-fade-in">
       <main className="login-card glass-panel google-login-card">
-        <div className="login-header"><div className="ttu-logo-sim"><img src={ttuLogo} alt="Takoradi Technical University Logo" className="ttu-logo-img" /></div><h1>{isRegistering ? 'Digital Dashboard Reminded' : 'Welcome to TTU Design Hub'}</h1><p className="subtitle">{isRegistering ? 'Complete your academic profile, then verify it securely with Google.' : 'Sign in with your verified Google account to access your academic workspace.'}</p></div>
+        <div className="login-header"><div className="ttu-logo-sim"><img src={ttuLogo} alt="Takoradi Technical University Logo" className="ttu-logo-img" /></div><h1>{isRegistering ? 'Digital Dashboard Reminded' : 'Welcome'}</h1><p className="subtitle">{isRegistering ? 'Complete your academic profile, then verify it securely with Google.' : 'Sign in with your verified Google account to access your academic workspace.'}</p></div>
         {error && <div className="login-error-alert"><span>Warning: {error}</span></div>}
         {notice && <div className="login-success-alert"><span>{notice}</span></div>}
         {isRegistering && <div className="login-form registration-form">
