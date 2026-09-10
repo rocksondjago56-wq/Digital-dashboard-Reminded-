@@ -4,12 +4,14 @@ import './Login.css';
 import ttuLogo from '../ttu-logo.png.png';
 import { getSupabaseSession, saveSupabaseProfile, signInWithGoogle } from '../lib/supabase';
 
+const COURSE_OPTIONS = ['Layout Design II', 'Vector Graphics I', 'Typography', 'Photography', 'Brand Identity', 'Motion Graphics'];
+
 export default function Login() {
   const { googleSignIn, googleVerificationPending, confirmGoogleVerification } = useContext(DbContext);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [isRegistering, setIsRegistering] = useState(false);
-  const [profile, setProfile] = useState({ role: 'student', fullName: '', indexNumber: '', email: '', program: '', certificate: 'BTech', year: 'Year 1', lecturerId: '', staffId: '', phone: '', department: 'Graphic Design', position: '', coursesText: '' });
+  const [profile, setProfile] = useState({ role: 'student', fullName: '', indexNumber: '', email: '', program: '', certificate: 'BTech', year: 'Year 1', lecturerId: '', staffId: '', phone: '', department: 'Graphic Design', position: '', courses: [] });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const handledSession = useRef(false);
 
@@ -32,8 +34,8 @@ export default function Login() {
       handledSession.current = true;
       setIsSubmitting(true);
       const savedProfile = JSON.parse(sessionStorage.getItem('ttu_registration_profile') || 'null');
-      if (savedProfile) await saveSupabaseProfile({ ...savedProfile, courses: savedProfile.coursesText?.split(',').map(course => course.trim()).filter(Boolean) || [] });
-      const result = await googleSignIn(session.access_token, session.user, savedProfile ? { ...savedProfile, courses: savedProfile.coursesText?.split(',').map(course => course.trim()).filter(Boolean) || [] } : null);
+      if (savedProfile) await saveSupabaseProfile(savedProfile);
+      const result = await googleSignIn(session.access_token, session.user, savedProfile);
       sessionStorage.removeItem('ttu_registration_profile');
       if (!result.success) {
         setError(result.message || 'Your Google account could not be linked to the TTU portal.');
@@ -52,7 +54,7 @@ export default function Login() {
         const required = profile.role === 'student'
           ? [profile.fullName, profile.indexNumber, profile.email, profile.program, profile.certificate, profile.year]
           : profile.role === 'lecturer'
-            ? [profile.fullName, profile.lecturerId, profile.email, profile.phone, profile.department, profile.coursesText]
+            ? [profile.fullName, profile.lecturerId, profile.email, profile.phone, profile.department, profile.courses.length ? 'courses-selected' : '']
             : [profile.fullName, profile.staffId, profile.email, profile.phone, profile.department, profile.position];
         if (required.some(value => !value.trim())) throw new Error('Complete all required registration fields before continuing with Google.');
       }
@@ -87,7 +89,7 @@ export default function Login() {
           <div className="form-group"><label>Role</label><select value={profile.role} onChange={e => setProfile({ ...profile, role: e.target.value })}><option value="student">Student</option><option value="lecturer">Lecturer</option><option value="admin">Administration Staff</option></select></div>
           <div className="form-group"><label>Full Name</label><input value={profile.fullName} onChange={e => setProfile({ ...profile, fullName: e.target.value })} /></div>
           {profile.role === 'student' && <><div className="form-group"><label>Index Number</label><input value={profile.indexNumber} onChange={e => setProfile({ ...profile, indexNumber: e.target.value })} /></div><div className="form-group"><label>Gmail Address</label><input type="email" value={profile.email} onChange={e => setProfile({ ...profile, email: e.target.value })} /></div><div className="form-group"><label>Program</label><input value={profile.program} onChange={e => setProfile({ ...profile, program: e.target.value })} /></div><div className="student-signup-row"><div className="form-group"><label>Certificate Type</label><select value={profile.certificate} onChange={e => setProfile({ ...profile, certificate: e.target.value })}><option>BTech</option><option>HND</option><option>Diploma</option></select></div><div className="form-group"><label>Year of Study</label><select value={profile.year} onChange={e => setProfile({ ...profile, year: e.target.value })}>{['Year 1','Year 2','Year 3','Year 4'].map(year => <option key={year}>{year}</option>)}</select></div></div></>}
-          {profile.role === 'lecturer' && <><div className="form-group"><label>Lecturer ID</label><input value={profile.lecturerId} onChange={e => setProfile({ ...profile, lecturerId: e.target.value })} /></div><ProfileContact profile={profile} setProfile={setProfile} /><div className="form-group"><label>Courses Taught</label><input value={profile.coursesText} onChange={e => setProfile({ ...profile, coursesText: e.target.value })} placeholder="Course A, Course B" /></div></>}
+          {profile.role === 'lecturer' && <><div className="form-group"><label>Lecturer ID</label><input value={profile.lecturerId} onChange={e => setProfile({ ...profile, lecturerId: e.target.value })} /></div><ProfileContact profile={profile} setProfile={setProfile} /><div className="form-group"><label htmlFor="courses">Courses Taught</label><select id="courses" multiple size="5" value={profile.courses} onChange={e => setProfile({ ...profile, courses: [...e.target.selectedOptions].map(option => option.value) })}>{COURSE_OPTIONS.map(course => <option key={course} value={course}>{course}</option>)}</select></div></>}
           {profile.role === 'admin' && <><div className="form-group"><label>Staff ID</label><input value={profile.staffId} onChange={e => setProfile({ ...profile, staffId: e.target.value })} /></div><ProfileContact profile={profile} setProfile={setProfile} /><div className="form-group"><label>Position</label><input value={profile.position} onChange={e => setProfile({ ...profile, position: e.target.value })} /></div></>}
         </div>}
         <button type="button" className="btn google-sign-in w-full" disabled={isSubmitting} onClick={handleGoogleSignIn}><span className="google-mark" aria-hidden="true">G</span>{isSubmitting ? 'Connecting to Google...' : 'Continue with Google'}</button>
