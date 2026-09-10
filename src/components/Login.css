@@ -97,6 +97,69 @@
   width: 100%;
 }
 
+.google-sign-in {
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: #1f2937;
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  box-shadow: 0 2px 5px rgba(15, 23, 42, 0.08);
+}
+
+.google-sign-in:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #94a3b8;
+}
+
+.google-mark {
+  font-weight: 800;
+  font-size: 1.1rem;
+  color: #4285f4;
+}
+
+.sign-in-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 18px 0;
+  color: #64748b;
+  font-size: 0.8rem;
+}
+
+.sign-in-divider::before,
+.sign-in-divider::after {
+  content: '';
+  height: 1px;
+  flex: 1;
+  background: #e2e8f0;
+}
+
+.google-account-note {
+  margin-top: 18px;
+  text-align: center;
+  color: #64748b;
+  font-size: 0.82rem;
+}
+
+.whatsapp-help {
+  margin-top: 24px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: rgba(37, 211, 102, 0.08);
+  border: 1px solid rgba(37, 211, 102, 0.25);
+  border-radius: var(--radius-sm);
+}
+
+.whatsapp-help-copy { display: grid; gap: 2px; font-size: 0.75rem; color: #64748b; }
+.whatsapp-help-copy strong { color: #0f172a; font-size: 0.8rem; }
+.whatsapp-help-button { border: 0; border-radius: 6px; padding: 7px 10px; background: #25d366; color: #fff; font-weight: 600; font-size: 0.72rem; cursor: pointer; white-space: nowrap; }
+
 .login-footer {
   text-align: center;
   margin-top: 35px;

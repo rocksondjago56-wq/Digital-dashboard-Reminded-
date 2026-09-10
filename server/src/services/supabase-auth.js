@@ -1,6 +1,6 @@
 const getSupabaseConfig = () => ({
-  url: process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL,
-  publishableKey: process.env.SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY
+  url: process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://htxbrxxtchomuhshdqtw.supabase.co',
+  publishableKey: process.env.SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_InT6fS6X6aZ33A383GxhBQ_Mn88-aO3'
 });
 
 export const isSupabaseAuthConfigured = () => {
@@ -10,10 +10,10 @@ export const isSupabaseAuthConfigured = () => {
 
 export async function getVerifiedSupabaseUser(accessToken) {
   if (!isSupabaseAuthConfigured()) {
-    throw new Error('Supabase email verification is not configured on the server.');
+    throw new Error('Supabase authentication is not configured on the server.');
   }
   if (!accessToken) {
-    throw new Error('Verify the email code before activating the account.');
+    throw new Error('Google authentication is required before creating a portal session.');
   }
 
   const { url, publishableKey } = getSupabaseConfig();
@@ -25,7 +25,7 @@ export async function getVerifiedSupabaseUser(accessToken) {
   });
 
   if (!response.ok) {
-    throw new Error('The Supabase verification session is invalid or has expired. Request a new code.');
+    throw new Error('The Google authentication session is invalid or has expired. Please continue with Google again.');
   }
 
   return response.json();

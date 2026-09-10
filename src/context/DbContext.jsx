@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { DbContext } from './DbContextDefinition';
 import { api, isApiAvailable, getToken, setToken, clearToken } from '../lib/api';
 import { createClassGroupTitle } from '../utils/whatsapp';
+import { signOutOfGoogle } from '../lib/supabase';
 
 // ─── Mock / Fallback Data ───────────────────────────────────────────────────
 // Used when the backend server is not running (localStorage mode).
@@ -559,7 +560,7 @@ export const DbProvider = ({ children }) => {
       const expectedPassword = user.password || `${user.role}123`;
       if (password === expectedPassword) {
         if (!user.isVerified) {
-          return { success: false, message: 'Account verification is required. Verify the code sent to your email before signing in.', requiresVerification: true };
+          return { success: false, message: 'This account now uses Google sign-in. Select Continue with Google to access the portal.' };
         }
         const updatedUsers = [
           ...accountRecords.filter(u => u.email?.toLowerCase() !== user.email.toLowerCase()),
@@ -577,116 +578,48 @@ export const DbProvider = ({ children }) => {
     return { success: false, message: 'Account not found. Use your email, mobile number, full name, index number, or staff ID.' };
   };
 
-  const signUp = async (name, email, password, role = 'student', extraFields = {}) => {
-    // API Mode
+  const googleSignIn = async (accessToken, googleUser) => {
     if (useApi) {
       try {
-        const result = await api.auth.signup({
-          name,
-          email,
-          password,
-          role,
-          ...extraFields
-        });
-
+        const result = await api.auth.googleSignIn(accessToken);
         if (result.success) {
-          if (result.user && !result.requiresVerification) {
-            setToken(result.token);
-            setCurrentUser(result.user);
-          }
-          addNotification(`New user registered: ${result.user?.name || name} (${role})`);
-          return { success: true, user: result.user, message: result.message, requiresVerification: result.requiresVerification };
+          setToken(result.token);
+          setCurrentUser(result.user);
+          await refreshRemoteData();
+          addNotification(`User ${result.user.name} signed in with Google.`);
+          return { success: true, user: result.user };
         }
-        return { success: false, message: result.error || 'Signup failed.' };
+        return { success: false, message: result.error || 'Google sign-in failed.' };
       } catch (error) {
-        return { success: false, message: error.message };
+        if (!googleUser?.email) return { success: false, message: error.message };
       }
     }
 
-    // localStorage Mode (original logic)
-    const emailLower = email.trim().toLowerCase();
-    const savedUsers = getSavedUsers();
-    const accountRecords = savedUsers || users;
-
-    const exists = accountRecords.some(u => u.email?.toLowerCase() === emailLower);
-    if (exists) {
-      return { success: false, message: 'This email is already registered. Use Sign In instead.' };
-    }
-
-    const verificationCode = String(Math.floor(100000 + Math.random() * 900000));
-    const newUser = {
-      id: `u_${Date.now()}`,
-      name: name.trim(),
-      email: emailLower,
-      password,
-      role,
+    if (!googleUser?.email) return { success: false, message: 'Google did not provide an email address for this account.' };
+    const accountRecords = getSavedUsers() || users;
+    const existingUser = accountRecords.find(user => user.email?.toLowerCase() === googleUser.email.toLowerCase());
+    const user = existingUser ? {
+      ...existingUser,
+      isVerified: true,
+      profilePic: googleUser.user_metadata?.avatar_url || googleUser.user_metadata?.picture || existingUser.profilePic
+    } : {
+      id: `google-${googleUser.id}`,
+      name: googleUser.user_metadata?.full_name || googleUser.user_metadata?.name || googleUser.email.split('@')[0],
+      email: googleUser.email.toLowerCase(),
+      role: 'student',
       department: 'Graphic Design',
-      ...extraFields,
-      isVerified: false,
-      verificationCode,
-      completedDeadlines: (role === 'student' || role === 'student_head') ? [] : undefined,
-      year: extraFields.year || (role === 'student' || role === 'student_head' ? 'Year 1' : undefined),
-      certificate: extraFields.certificate || (role === 'student' || role === 'student_head' ? 'BTech' : undefined),
-      studentId: extraFields.studentId || extraFields.indexNumber || (role === 'student' || role === 'student_head' ? `04${Math.floor(10000000 + Math.random() * 90000000)}` : undefined),
-      courses: parseCourses(extraFields.courses).length ? parseCourses(extraFields.courses) : (role === 'lecturer' ? ['General Design'] : [])
+      certificate: 'BTech',
+      year: 'Year 1',
+      studentId: `04${Math.floor(10000000 + Math.random() * 90000000)}`,
+      courses: [],
+      profilePic: googleUser.user_metadata?.avatar_url || googleUser.user_metadata?.picture || '',
+      isVerified: true,
+      completedDeadlines: []
     };
-
-    const updatedUsers = [...accountRecords, newUser];
-    syncUsers(updatedUsers);
-    addNotification(`New local user registered: ${newUser.name} (${newUser.role})`);
-    return {
-      success: true,
-      user: newUser,
-      requiresVerification: true,
-      message: 'Account created. Request a verification code to finish activation.'
-    };
-  };
-
-  const requestVerification = async (identifier) => {
-    if (useApi) {
-      try {
-        return await api.auth.requestVerification(identifier);
-      } catch (error) {
-        return { success: false, message: error.message };
-      }
-    }
-    const term = identifier.trim().toLowerCase();
-    const user = (getSavedUsers() || users).find(item =>
-      [item.email, item.studentId, item.staffId].filter(Boolean).some(value => value.toLowerCase() === term) || matchesPhone(item.phone, term)
-    );
-    if (!user) return { success: false, message: 'No account or preloaded identity was found.' };
-    const verificationCode = String(Math.floor(100000 + Math.random() * 900000));
-    const accountRecords = getSavedUsers() || users;
-    const updated = accountRecords.map(item => item.id === user.id ? { ...item, verificationCode, isVerified: false } : item);
-    syncUsers(updated);
-    return {
-      success: true,
-      message: 'A verification code was sent to the registered email address.'
-    };
-  };
-
-  const activateAccount = async (identifier, verificationProof, password) => {
-    if (useApi) {
-      try {
-        return await api.auth.activateAccount(identifier, verificationProof, password);
-      } catch (error) {
-        return { success: false, message: error.message };
-      }
-    }
-    const term = identifier.trim().toLowerCase();
-    const accountRecords = getSavedUsers() || users;
-    const user = accountRecords.find(item =>
-      [item.email, item.studentId, item.staffId].filter(Boolean).some(value => value.toLowerCase() === term) || matchesPhone(item.phone, term)
-    );
-
-    if (!user) return { success: false, message: 'Account not found.' };
-    if (!password || password.length < 6) return { success: false, message: 'Password must be at least 6 characters.' };
-
-    if (!verificationProof?.trim() || verificationProof.trim() !== user.verificationCode) return { success: false, message: 'The verification code is incorrect.' };
-
-    const updatedUsers = accountRecords.map(item => item.id === user.id ? { ...item, ...(password ? { password } : {}), isVerified: true, verificationCode: undefined } : item);
-    syncUsers(updatedUsers);
-    return { success: true, message: `Account verified for ${user.name}. You can now sign in.` };
+    syncUsers([...accountRecords.filter(item => item.email?.toLowerCase() !== user.email), user]);
+    setCurrentUser(user);
+    localStorage.setItem(CURRENT_USER_STORAGE_KEY, JSON.stringify(user));
+    return { success: true, user };
   };
 
   const logout = async () => {
@@ -694,6 +627,7 @@ export const DbProvider = ({ children }) => {
       addNotification(`User ${currentUser.name} logged out.`);
     }
     clearToken();
+    signOutOfGoogle().catch(() => {});
     localStorage.removeItem(CURRENT_USER_STORAGE_KEY);
     setCurrentUser(null);
   };
@@ -1229,10 +1163,8 @@ export const DbProvider = ({ children }) => {
       classGroups,
       loading,
       login,
+      googleSignIn,
       logout,
-      signUp,
-      requestVerification,
-      activateAccount,
       addDeadline,
       updateDeadline,
       deleteDeadline,

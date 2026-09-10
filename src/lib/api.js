@@ -95,8 +95,7 @@ export const api = {
       }),
 
     me: () => request('/auth/me'),
-    requestVerification: (identifier) => request('/auth/request-verification', { method: 'POST', body: JSON.stringify({ identifier }) }),
-    activateAccount: (identifier, accessToken, password) => request('/auth/activate-account', { method: 'POST', body: JSON.stringify({ identifier, accessToken, password }) })
+    googleSignIn: (accessToken) => request('/auth/google-signin', { method: 'POST', body: JSON.stringify({ accessToken }) })
   },
 
   // --- Deadlines ---

@@ -13,31 +13,23 @@ export const supabase = isSupabaseConfigured
   ? createClient(supabaseUrl, supabaseKey)
   : null;
 
-export async function sendEmailVerificationCode(email) {
-  if (!supabase) throw new Error('Supabase email verification is not configured.');
+export async function signInWithGoogle() {
+  if (!supabase) throw new Error('Supabase Google sign-in is not configured.');
 
-  const { error } = await supabase.auth.signInWithOtp({
-    email: email.trim().toLowerCase(),
-    options: { shouldCreateUser: true }
-  });
-  if (error) {
-    const message = error.message?.toLowerCase() || '';
-    if (error.code === 'email_address_not_authorized' || message.includes('sending magic link email')) {
-      throw new Error('Supabase cannot send to this email with its default sender. Add this email to your Supabase Organization Team for testing, or configure Custom SMTP in Supabase Auth.');
-    }
-    throw error;
-  }
-}
-
-export async function verifyEmailVerificationCode(email, code) {
-  if (!supabase) throw new Error('Supabase email verification is not configured.');
-
-  const { data, error } = await supabase.auth.verifyOtp({
-    email: email.trim().toLowerCase(),
-    token: code.trim(),
-    type: 'email'
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo: `${window.location.origin}/` }
   });
   if (error) throw error;
-  if (!data.session?.access_token) throw new Error('Supabase did not return a verified session. Request a new code.');
-  return data.session.access_token;
+}
+
+export async function getSupabaseSession() {
+  if (!supabase) return null;
+  const { data, error } = await supabase.auth.getSession();
+  if (error) throw error;
+  return data.session;
+}
+
+export async function signOutOfGoogle() {
+  if (supabase) await supabase.auth.signOut();
 }
