@@ -299,6 +299,32 @@ export const DbProvider = ({ children }) => {
   const [useApi, setUseApi] = useState(false); // true when backend is available
   const [googleVerificationPending, setGoogleVerificationPending] = useState(false);
 
+  useEffect(() => {
+    if (!currentUser || googleVerificationPending) return undefined;
+
+    const timeoutMs = 30 * 60 * 1000;
+    let timer;
+    const endInactiveSession = () => {
+      sessionStorage.setItem('ttu_session_notice', 'Your session timed out after 30 minutes of inactivity. Please continue with Google again.');
+      clearToken();
+      signOutOfGoogle().catch(() => {});
+      localStorage.removeItem(CURRENT_USER_STORAGE_KEY);
+      setCurrentUser(null);
+      setGoogleVerificationPending(false);
+    };
+    const resetTimer = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(endInactiveSession, timeoutMs);
+    };
+    const events = ['click', 'keydown', 'touchstart', 'mousemove'];
+    events.forEach(event => window.addEventListener(event, resetTimer, { passive: true }));
+    resetTimer();
+    return () => {
+      window.clearTimeout(timer);
+      events.forEach(event => window.removeEventListener(event, resetTimer));
+    };
+  }, [currentUser, googleVerificationPending]);
+
   // ─── Notifications (always local) ──────────────────────────────────────
   const addNotification = useCallback((text) => {
     const newNotif = {

@@ -7,10 +7,16 @@ import { getSupabaseSession, signInWithGoogle } from '../lib/supabase';
 export default function Login() {
   const { googleSignIn, googleVerificationPending, confirmGoogleVerification } = useContext(DbContext);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const handledSession = useRef(false);
 
   useEffect(() => {
+    const sessionNotice = sessionStorage.getItem('ttu_session_notice');
+    if (sessionNotice) {
+      setNotice(sessionNotice);
+      sessionStorage.removeItem('ttu_session_notice');
+    }
     const errorCode = new URLSearchParams(window.location.search).get('error');
     if (!errorCode) return;
     setError('Google sign-in could not be completed. Check the Google provider settings in Supabase and try again.');
@@ -63,6 +69,7 @@ export default function Login() {
       <main className="login-card glass-panel google-login-card">
         <div className="login-header"><div className="ttu-logo-sim"><img src={ttuLogo} alt="Takoradi Technical University Logo" className="ttu-logo-img" /></div><h1>Welcome to TTU Design Hub</h1><p className="subtitle">Sign in with your Google account to access your academic workspace, course updates, and class reminders.</p></div>
         {error && <div className="login-error-alert"><span>Warning: {error}</span></div>}
+        {notice && <div className="login-success-alert"><span>{notice}</span></div>}
         <button type="button" className="btn google-sign-in w-full" disabled={isSubmitting} onClick={handleGoogleSignIn}><span className="google-mark" aria-hidden="true">G</span>{isSubmitting ? 'Connecting to Google...' : 'Continue with Google'}</button>
         <p className="google-account-note">First-time users receive a secure TTU Design Hub profile automatically.</p>
         <div className="login-footer"><p>© 2026 Takoradi Technical University</p><p>Faculty of Applied Arts & Technology</p></div>
