@@ -144,6 +144,12 @@
   font-size: 0.82rem;
 }
 
+.google-login-card { max-width: 500px; }
+.verification-check { width: 74px; height: 74px; margin: 0 auto 22px; display: grid; place-items: center; border-radius: 50%; background: #dcfce7; border: 1px solid #86efac; color: #15803d; font-size: 2.5rem; font-weight: 800; }
+.verified-card { text-align: center; max-width: 460px; }
+.verified-card h1 { font-size: 1.55rem; }
+.verification-copy { margin: 0 auto 26px; max-width: 340px; line-height: 1.55; }
+
 .whatsapp-help {
   margin-top: 24px;
   padding: 12px 14px;

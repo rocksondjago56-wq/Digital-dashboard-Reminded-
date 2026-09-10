@@ -27,7 +27,7 @@ export default function App() {
     );
   }
 
-  const { currentUser, loading } = ctx;
+  const { currentUser, loading, googleVerificationPending } = ctx;
 
   if (loading) {
     return (
@@ -60,7 +60,7 @@ export default function App() {
   }
 
   // If user is not authenticated, show Login Screen
-  if (!currentUser) {
+  if (!currentUser || googleVerificationPending) {
     return (
       <>
         <Login />

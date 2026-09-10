@@ -297,6 +297,7 @@ export const DbProvider = ({ children }) => {
   const [studentArchive, setStudentArchive] = useState([]);
   const [loading, setLoading] = useState(true);
   const [useApi, setUseApi] = useState(false); // true when backend is available
+  const [googleVerificationPending, setGoogleVerificationPending] = useState(false);
 
   // ─── Notifications (always local) ──────────────────────────────────────
   const addNotification = useCallback((text) => {
@@ -585,6 +586,7 @@ export const DbProvider = ({ children }) => {
         if (result.success) {
           setToken(result.token);
           setCurrentUser(result.user);
+          setGoogleVerificationPending(true);
           await refreshRemoteData();
           addNotification(`User ${result.user.name} signed in with Google.`);
           return { success: true, user: result.user };
@@ -618,6 +620,7 @@ export const DbProvider = ({ children }) => {
     };
     syncUsers([...accountRecords.filter(item => item.email?.toLowerCase() !== user.email), user]);
     setCurrentUser(user);
+    setGoogleVerificationPending(true);
     localStorage.setItem(CURRENT_USER_STORAGE_KEY, JSON.stringify(user));
     return { success: true, user };
   };
@@ -630,7 +633,10 @@ export const DbProvider = ({ children }) => {
     signOutOfGoogle().catch(() => {});
     localStorage.removeItem(CURRENT_USER_STORAGE_KEY);
     setCurrentUser(null);
+    setGoogleVerificationPending(false);
   };
+
+  const confirmGoogleVerification = () => setGoogleVerificationPending(false);
 
   // ─── Deadlines ────────────────────────────────────────────────────────
 
@@ -1162,8 +1168,10 @@ export const DbProvider = ({ children }) => {
       timetable,
       classGroups,
       loading,
+      googleVerificationPending,
       login,
       googleSignIn,
+      confirmGoogleVerification,
       logout,
       addDeadline,
       updateDeadline,
