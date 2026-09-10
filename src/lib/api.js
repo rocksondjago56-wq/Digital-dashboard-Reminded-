@@ -95,7 +95,7 @@ export const api = {
       }),
 
     me: () => request('/auth/me'),
-    googleSignIn: (accessToken) => request('/auth/google-signin', { method: 'POST', body: JSON.stringify({ accessToken }) })
+    googleSignIn: (accessToken, profile) => request('/auth/google-signin', { method: 'POST', body: JSON.stringify({ accessToken, profile }) })
   },
 
   // --- Deadlines ---

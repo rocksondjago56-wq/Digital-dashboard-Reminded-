@@ -50,7 +50,7 @@ function formatUser(user, completedDeadlines = []) {
  */
 router.post('/google-signin', async (req, res) => {
   try {
-    const { accessToken } = req.body;
+    const { accessToken, profile = {} } = req.body;
     const googleUser = await getVerifiedSupabaseUser(accessToken);
     const hasGoogleProvider = googleUser.app_metadata?.providers?.includes('google');
     if (!hasGoogleProvider || !googleUser.email) {
@@ -58,26 +58,37 @@ router.post('/google-signin', async (req, res) => {
     }
 
     const email = googleUser.email.trim().toLowerCase();
+    if (profile.email?.trim() && profile.email.trim().toLowerCase() !== email) {
+      return res.status(400).json({ error: 'Use the same Google email address entered during registration.' });
+    }
     const metadata = googleUser.user_metadata || {};
-    const name = metadata.full_name || metadata.name || email.split('@')[0];
+    const name = profile.fullName?.trim() || metadata.full_name || metadata.name || email.split('@')[0];
     const profilePictureUrl = metadata.avatar_url || metadata.picture || null;
+    const role = ['student', 'lecturer', 'admin'].includes(profile.role) ? profile.role : 'student';
+    const courses = Array.isArray(profile.courses) ? profile.courses.filter(Boolean) : [];
 
     const user = await prisma.user.upsert({
       where: { email },
       update: {
         name,
         profilePictureUrl: profilePictureUrl || undefined,
-        isVerified: true
+        isVerified: true,
+        phone: profile.phone?.trim() || undefined,
+        department: profile.department?.trim() || undefined
       },
       create: {
         name,
         email,
         passwordHash: await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 12),
-        role: 'student',
-        department: 'Graphic Design',
-        year: 'Year 1',
-        certificate: 'BTech',
-        studentId: `04${Math.floor(10000000 + Math.random() * 90000000)}`,
+        role,
+        department: profile.department?.trim() || 'Graphic Design',
+        year: role === 'student' ? profile.year || 'Year 1' : null,
+        certificate: role === 'student' ? profile.certificate || 'BTech' : null,
+        studentId: role === 'student' ? profile.indexNumber?.trim() || `04${Math.floor(10000000 + Math.random() * 90000000)}` : null,
+        staffId: role === 'student' ? null : (profile.lecturerId || profile.staffId || null),
+        phone: profile.phone?.trim() || null,
+        designation: role === 'admin' ? profile.position?.trim() || null : null,
+        courses: role === 'lecturer' ? courses : [],
         profilePictureUrl,
         isVerified: true
       }

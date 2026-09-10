@@ -13,12 +13,14 @@ export const supabase = isSupabaseConfigured
   ? createClient(supabaseUrl, supabaseKey)
   : null;
 
-export async function signInWithGoogle() {
+export async function signInWithGoogle(profile = null) {
   if (!supabase) throw new Error('Supabase Google sign-in is not configured.');
+
+  if (profile) sessionStorage.setItem('ttu_registration_profile', JSON.stringify(profile));
 
   const { error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
-    options: { redirectTo: `${window.location.origin}/` }
+    options: { redirectTo: `${window.location.origin}/`, data: profile || undefined }
   });
   if (error) throw error;
 }
@@ -28,6 +30,12 @@ export async function getSupabaseSession() {
   const { data, error } = await supabase.auth.getSession();
   if (error) throw error;
   return data.session;
+}
+
+export async function saveSupabaseProfile(profile) {
+  if (!supabase) return;
+  const { error } = await supabase.auth.updateUser({ data: profile });
+  if (error) throw error;
 }
 
 export async function signOutOfGoogle() {

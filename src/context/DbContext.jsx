@@ -605,10 +605,10 @@ export const DbProvider = ({ children }) => {
     return { success: false, message: 'Account not found. Use your email, mobile number, full name, index number, or staff ID.' };
   };
 
-  const googleSignIn = async (accessToken, googleUser) => {
+  const googleSignIn = async (accessToken, googleUser, profile = null) => {
     if (useApi) {
       try {
-        const result = await api.auth.googleSignIn(accessToken);
+        const result = await api.auth.googleSignIn(accessToken, profile);
         if (result.success) {
           setToken(result.token);
           setCurrentUser(result.user);
@@ -634,12 +634,15 @@ export const DbProvider = ({ children }) => {
       id: `google-${googleUser.id}`,
       name: googleUser.user_metadata?.full_name || googleUser.user_metadata?.name || googleUser.email.split('@')[0],
       email: googleUser.email.toLowerCase(),
-      role: 'student',
-      department: 'Graphic Design',
-      certificate: 'BTech',
-      year: 'Year 1',
-      studentId: `04${Math.floor(10000000 + Math.random() * 90000000)}`,
-      courses: [],
+      role: profile?.role || 'student',
+      department: profile?.department || 'Graphic Design',
+      certificate: profile?.certificate || 'BTech',
+      year: profile?.year || 'Year 1',
+      studentId: profile?.indexNumber || `04${Math.floor(10000000 + Math.random() * 90000000)}`,
+      staffId: profile?.staffId || profile?.lecturerId || '',
+      phone: profile?.phone || '',
+      designation: profile?.position || '',
+      courses: profile?.courses || [],
       profilePic: googleUser.user_metadata?.avatar_url || googleUser.user_metadata?.picture || '',
       isVerified: true,
       completedDeadlines: []
