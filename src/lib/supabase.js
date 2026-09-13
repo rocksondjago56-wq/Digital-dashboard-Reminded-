@@ -13,13 +13,19 @@ export const supabase = isSupabaseConfigured
   ? createClient(supabaseUrl, supabaseKey)
   : null;
 
+const LIVE_PORTAL_URL = 'https://digital-dashboard-reminded.vercel.app';
+
 const getGoogleRedirectUrl = () => {
   const publicAppUrl = import.meta.env.VITE_PUBLIC_APP_URL?.replace(/\/$/, '');
-  if (publicAppUrl) return `${publicAppUrl}/`;
+  const isValidPublicUrl = publicAppUrl
+    && /^https:\/\//i.test(publicAppUrl)
+    && !/https:\/\/(localhost|127\.0\.0\.1|\[::1\])/i.test(publicAppUrl)
+    && !/your-portal\.vercel\.app/i.test(publicAppUrl);
+  if (isValidPublicUrl) return `${publicAppUrl}/`;
 
   const isLocalHost = ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname);
   return isLocalHost
-    ? 'https://digital-dashboard-reminded.vercel.app/'
+    ? `${LIVE_PORTAL_URL}/`
     : `${window.location.origin}/`;
 };
 
