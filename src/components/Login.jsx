@@ -50,6 +50,10 @@ export default function Login() {
     setError('');
     setIsSubmitting(true);
     try {
+      const isPhone = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+      if (isPhone && window.location.hostname === 'localhost' && !import.meta.env.VITE_PUBLIC_APP_URL) {
+        throw new Error('This phone cannot use localhost after Google verification. Open the deployed TTU portal URL instead, or set VITE_PUBLIC_APP_URL to the portal URL before signing in.');
+      }
       if (isRegistering) {
         const required = profile.role === 'student'
           ? [profile.fullName, profile.indexNumber, profile.email, profile.program, profile.certificate, profile.year]

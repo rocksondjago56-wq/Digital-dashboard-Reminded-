@@ -13,6 +13,12 @@ export const supabase = isSupabaseConfigured
   ? createClient(supabaseUrl, supabaseKey)
   : null;
 
+const getGoogleRedirectUrl = () => {
+  const publicAppUrl = import.meta.env.VITE_PUBLIC_APP_URL?.replace(/\/$/, '');
+  if (publicAppUrl) return `${publicAppUrl}/`;
+  return `${window.location.origin}/`;
+};
+
 export async function signInWithGoogle(profile = null) {
   if (!supabase) throw new Error('Supabase Google sign-in is not configured.');
 
@@ -20,7 +26,7 @@ export async function signInWithGoogle(profile = null) {
 
   const { error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
-    options: { redirectTo: `${window.location.origin}/`, data: profile || undefined }
+    options: { redirectTo: getGoogleRedirectUrl(), data: profile || undefined }
   });
   if (error) throw error;
 }
