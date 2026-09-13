@@ -336,7 +336,7 @@ export default function AdminDashboard() {
 
   const handleWhatsAppGroupSubmit = (e) => {
     e.preventDefault();
-    if (!wgHeadPhone.trim() || !wgInviteLink.trim() || !saveClassWhatsAppGroup) return;
+    if (!wgInviteLink.trim() || !saveClassWhatsAppGroup) return;
 
     const savedGroup = saveClassWhatsAppGroup({
       year: wgYear,
@@ -873,7 +873,7 @@ export default function AdminDashboard() {
         {adminTab === 'whatsapp' && (
           <div>
             <div className="tab-actions-row">
-              <h3>Class Head WhatsApp Numbers</h3>
+              <h3>Class Group Links</h3>
               <button
                 onClick={() => {
                   if (showForm) {
@@ -884,7 +884,7 @@ export default function AdminDashboard() {
                 }}
                 className="btn btn-primary btn-sm"
               >
-                {showForm ? 'Cancel' : 'Add Class Number'}
+                {showForm ? 'Cancel' : 'Add Class Group'}
               </button>
             </div>
 
@@ -927,12 +927,11 @@ export default function AdminDashboard() {
                       value={wgHeadPhone}
                       onChange={(e) => setWgHeadPhone(e.target.value)}
                       placeholder="233241234567"
-                      required
                     />
                   </div>
                 </div>
                 <div className="form-group">
-                  <label>WhatsApp Group Invite Link</label>
+                  <label>Class Group Link</label>
                   <input
                     type="url"
                     value={wgInviteLink}
@@ -949,7 +948,7 @@ export default function AdminDashboard() {
             <div className="admin-data-list mt-2">
               {(classGroups || []).length === 0 ? (
                 <div className="empty-state">
-                  <p>No class WhatsApp numbers have been saved yet.</p>
+                  <p>No class group links have been saved yet.</p>
                 </div>
               ) : (
                 classGroups.map(group => (
@@ -958,7 +957,7 @@ export default function AdminDashboard() {
                       <h4>{group.title}</h4>
                       <p>Class Head: {group.headName || 'Class Head'}</p>
                       <span className="row-meta">
-                        Year: {group.year} | WhatsApp: +{group.headPhone || 'Not set'} {group.inviteLink ? '| Invite link added' : ''}
+                        Year: {group.year} | {group.inviteLink ? 'Class group link added' : 'No class group link available yet.'}
                       </span>
                     </div>
                     <div className="admin-row-actions">

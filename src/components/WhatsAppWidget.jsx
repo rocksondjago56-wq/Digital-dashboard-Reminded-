@@ -5,8 +5,7 @@ import {
   saveWhatsAppConfig,
   openWhatsApp,
   formatCustomBroadcast,
-  createClassGroupTitle,
-  formatClassGroupJoinRequest
+  createClassGroupTitle
 } from '../utils/whatsapp';
 import './WhatsAppWidget.css';
 
@@ -40,7 +39,7 @@ export default function WhatsAppWidget() {
   const visibleClassGroups = (classGroups || []).filter(group => {
     if (!currentUser) return false;
     if (currentUser.role === 'admin' || currentUser.role === 'student_head') return true;
-    return group.year === currentUser.year && Boolean(group.inviteLink);
+    return group.year === currentUser.year;
   });
 
   useEffect(() => {
@@ -76,20 +75,12 @@ export default function WhatsAppWidget() {
   };
 
   const handleClassGroupOpen = (group) => {
-    if (group.inviteLink) {
-      window.open(group.inviteLink, '_blank', 'noopener,noreferrer');
-      return;
-    }
-
-    openWhatsApp({
-      phone: group.headPhone,
-      text: formatClassGroupJoinRequest(group, currentUser)
-    });
+    if (group.inviteLink) window.open(group.inviteLink, '_blank', 'noopener,noreferrer');
   };
 
   const handleSaveClassGroup = (e) => {
     e.preventDefault();
-    if (!saveClassWhatsAppGroup || !classHeadPhone.trim() || !classInviteLink.trim()) return;
+    if (!saveClassWhatsAppGroup || !classInviteLink.trim()) return;
 
     const savedGroup = saveClassWhatsAppGroup({
       year: classYear,
@@ -159,11 +150,11 @@ export default function WhatsAppWidget() {
       <button
         className={`whatsapp-floating-btn ${isOpen ? 'active' : ''}`}
         onClick={() => setIsOpen(!isOpen)}
-        aria-label="WhatsApp Department Connect"
-        title="Connect via WhatsApp"
+        aria-label="Open Class Group"
+        title="Class Group"
       >
         <span className="whatsapp-icon">💬</span>
-        <span className="whatsapp-btn-label desktop-only">WhatsApp Desk</span>
+        <span className="whatsapp-btn-label desktop-only">Class Group</span>
         <span className="whatsapp-pulse-ring"></span>
       </button>
 
@@ -176,7 +167,7 @@ export default function WhatsAppWidget() {
                 <span>💬</span>
               </div>
               <div>
-                <h4>TTU WhatsApp Hub</h4>
+                <h4>TTU Class Group</h4>
                 <p className="whatsapp-substatus">● Online · Graphic Design Dept</p>
               </div>
             </div>
@@ -216,7 +207,7 @@ export default function WhatsAppWidget() {
                   />
                 </div>
                 <div className="whatsapp-input-group">
-                  <label>Class/Department WhatsApp Group Link:</label>
+                  <label>Class Group Link</label>
                   <input
                     type="url"
                     value={tempGroupUrl}
@@ -245,7 +236,7 @@ export default function WhatsAppWidget() {
                   className={`whatsapp-tab-btn ${activeTab === 'groups' ? 'active' : ''}`}
                   onClick={() => setActiveTab('groups')}
                 >
-                  Class Groups
+                  Class Group
                 </button>
                 <button
                   className={`whatsapp-tab-btn ${activeTab === 'broadcast' ? 'active' : ''}`}
@@ -297,7 +288,7 @@ export default function WhatsAppWidget() {
                 {activeTab === 'groups' && (
                   <div className="whatsapp-groups-tab">
                     <p className="whatsapp-tab-intro">
-                      Stay connected with instant announcements, studio files, and deadline reminders on WhatsApp.
+                      View your class group and join using the link shared by your administrator.
                     </p>
 
                     {isClassHead && (
@@ -342,7 +333,7 @@ export default function WhatsAppWidget() {
                         </div>
 
                         <div className="whatsapp-input-group">
-                          <label htmlFor="classInviteLink">WhatsApp Group Invite Link</label>
+                          <label htmlFor="classInviteLink">Class Group Link</label>
                           <input
                             id="classInviteLink"
                             type="url"
@@ -367,22 +358,22 @@ export default function WhatsAppWidget() {
                             <span className="whatsapp-group-icon">WA</span>
                             <div>
                               <strong>{group.title}</strong>
-                              <p>{group.year} - Class Head: {group.headName || 'Class Head'}</p>
-                              <p>{group.inviteLink ? 'Invite link available' : `WhatsApp: +${group.headPhone}`}</p>
+                              <p>{group.year} class updates, announcements, and course discussion.</p>
+                              <p>{group.inviteLink ? 'Class group link available.' : 'No class group link available yet.'}</p>
                             </div>
                           </div>
                           <div className="whatsapp-group-actions">
                             <button
                               className="btn btn-whatsapp-primary btn-sm"
                               onClick={() => handleClassGroupOpen(group)}
-                              disabled={!group.inviteLink && !group.headPhone}
+                              disabled={!group.inviteLink}
                             >
-                              {group.inviteLink ? 'Join Group' : 'Message Class Head'}
+                              Join Class Group
                             </button>
                             <button
                               className="btn btn-secondary btn-sm"
                               onClick={() => copyClassGroupContact(group)}
-                              disabled={!group.inviteLink && !group.headPhone}
+                              disabled={!group.inviteLink}
                             >
                               {copiedClassGroupId === group.id ? 'Copied' : 'Copy'}
                             </button>
@@ -398,7 +389,7 @@ export default function WhatsAppWidget() {
                         </div>
                       )) : (
                         <div className="whatsapp-empty-group">
-                          No class WhatsApp group has been saved for your year yet.
+                          No class group link available yet.
                         </div>
                       )}
                     </div>
