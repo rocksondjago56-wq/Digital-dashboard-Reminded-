@@ -11,7 +11,8 @@ export default function Login() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [isRegistering, setIsRegistering] = useState(false);
-  const [profile, setProfile] = useState({ role: 'student', fullName: '', indexNumber: '', email: '', program: '', certificate: 'BTech', year: 'Year 1', lecturerId: '', staffId: '', phone: '', department: 'Graphic Design', position: '', courses: [] });
+  const [profile, setProfile] = useState({ role: 'student', fullName: '', indexNumber: '', email: '', program: '', certificate: 'BTech', year: 'Year 1', lecturerId: '', staffId: '', phone: '', department: 'Graphic Design', position: '', courses: [], accessCode: '' });
+  const [identityNumber, setIdentityNumber] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const handledSession = useRef(false);
 
@@ -36,7 +37,10 @@ export default function Login() {
       const savedProfile = JSON.parse(sessionStorage.getItem('ttu_registration_profile') || 'null')
         || session.user?.user_metadata?.registration_profile
         || null;
-      if (savedProfile) await saveSupabaseProfile(savedProfile);
+      if (savedProfile?.role) {
+        const { accessCode: _accessCode, ...profileMetadata } = savedProfile;
+        await saveSupabaseProfile(profileMetadata);
+      }
       const result = await googleSignIn(session.access_token, session.user, savedProfile);
       sessionStorage.removeItem('ttu_registration_profile');
       if (!result.success) {
@@ -56,11 +60,11 @@ export default function Login() {
         const required = profile.role === 'student'
           ? [profile.fullName, profile.indexNumber, profile.email, profile.program, profile.certificate, profile.year]
           : profile.role === 'lecturer'
-            ? [profile.fullName, profile.lecturerId, profile.email, profile.phone, profile.department, profile.courses.length ? 'courses-selected' : '']
-            : [profile.fullName, profile.staffId, profile.email, profile.phone, profile.department, profile.position];
+            ? [profile.fullName, profile.lecturerId, profile.email, profile.phone, profile.department, profile.courses.length ? 'courses-selected' : '', profile.accessCode]
+            : [profile.fullName, profile.staffId, profile.email, profile.phone, profile.department, profile.position, profile.accessCode];
         if (required.some(value => !value.trim())) throw new Error('Complete all required registration fields before continuing with Google.');
       }
-      await signInWithGoogle(isRegistering ? profile : null);
+      await signInWithGoogle(isRegistering ? profile : (identityNumber.trim() ? { identityNumber: identityNumber.trim() } : null));
     } catch (googleError) {
       setError(googleError.message || 'Google sign-in could not be started.');
       setIsSubmitting(false);
@@ -87,12 +91,13 @@ export default function Login() {
         <div className="login-header"><div className="ttu-logo-sim"><img src={ttuLogo} alt="Takoradi Technical University Logo" className="ttu-logo-img" /></div><h1>{isRegistering ? 'Digital Dashboard Reminded' : 'Welcome'}</h1><p className="subtitle">{isRegistering ? 'Complete your academic profile, then verify it securely with Google.' : 'Sign in with your verified Google account to access your academic workspace.'}</p></div>
         {error && <div className="login-error-alert"><span>Warning: {error}</span></div>}
         {notice && <div className="login-success-alert"><span>{notice}</span></div>}
+        {!isRegistering && <div className="login-form"><div className="form-group"><label htmlFor="staff-identity">Lecturer ID or Staff ID <span className="optional-label">(optional)</span></label><input id="staff-identity" value={identityNumber} onChange={event => setIdentityNumber(event.target.value)} placeholder="Enter your ID before Google sign-in" autoComplete="username" /></div></div>}
         {isRegistering && <div className="login-form registration-form">
           <div className="form-group"><label>Role</label><select value={profile.role} onChange={e => setProfile({ ...profile, role: e.target.value })}><option value="student">Student</option><option value="lecturer">Lecturer</option><option value="admin">Administration Staff</option></select></div>
           <div className="form-group"><label>Full Name</label><input value={profile.fullName} onChange={e => setProfile({ ...profile, fullName: e.target.value })} /></div>
           {profile.role === 'student' && <><div className="form-group"><label>Index Number</label><input value={profile.indexNumber} onChange={e => setProfile({ ...profile, indexNumber: e.target.value })} /></div><div className="form-group"><label>Gmail Address</label><input type="email" value={profile.email} onChange={e => setProfile({ ...profile, email: e.target.value })} /></div><div className="form-group"><label>Program</label><input value={profile.program} onChange={e => setProfile({ ...profile, program: e.target.value })} /></div><div className="student-signup-row"><div className="form-group"><label>Certificate Type</label><select value={profile.certificate} onChange={e => setProfile({ ...profile, certificate: e.target.value })}><option>BTech</option><option>HND</option><option>Diploma</option></select></div><div className="form-group"><label>Year of Study</label><select value={profile.year} onChange={e => setProfile({ ...profile, year: e.target.value })}>{['Year 1','Year 2','Year 3','Year 4'].map(year => <option key={year}>{year}</option>)}</select></div></div></>}
-          {profile.role === 'lecturer' && <><div className="form-group"><label>Lecturer ID</label><input value={profile.lecturerId} onChange={e => setProfile({ ...profile, lecturerId: e.target.value })} /></div><ProfileContact profile={profile} setProfile={setProfile} /><div className="form-group"><label htmlFor="courses">Courses Taught</label><select id="courses" multiple size="5" value={profile.courses} onChange={e => setProfile({ ...profile, courses: [...e.target.selectedOptions].map(option => option.value) })}>{COURSE_OPTIONS.map(course => <option key={course} value={course}>{course}</option>)}</select></div></>}
-          {profile.role === 'admin' && <><div className="form-group"><label>Staff ID</label><input value={profile.staffId} onChange={e => setProfile({ ...profile, staffId: e.target.value })} /></div><ProfileContact profile={profile} setProfile={setProfile} /><div className="form-group"><label>Position</label><input value={profile.position} onChange={e => setProfile({ ...profile, position: e.target.value })} /></div></>}
+          {profile.role === 'lecturer' && <><div className="form-group"><label>Lecturer ID</label><input value={profile.lecturerId} onChange={e => setProfile({ ...profile, lecturerId: e.target.value })} /></div><ProfileContact profile={profile} setProfile={setProfile} /><AccessCodeField profile={profile} setProfile={setProfile} /><div className="form-group"><label htmlFor="courses">Courses Taught</label><select id="courses" multiple size="5" value={profile.courses} onChange={e => setProfile({ ...profile, courses: [...e.target.selectedOptions].map(option => option.value) })}>{COURSE_OPTIONS.map(course => <option key={course} value={course}>{course}</option>)}</select></div></>}
+          {profile.role === 'admin' && <><div className="form-group"><label>Staff ID</label><input value={profile.staffId} onChange={e => setProfile({ ...profile, staffId: e.target.value })} /></div><ProfileContact profile={profile} setProfile={setProfile} /><AccessCodeField profile={profile} setProfile={setProfile} /><div className="form-group"><label>Position</label><input value={profile.position} onChange={e => setProfile({ ...profile, position: e.target.value })} /></div></>}
         </div>}
         <button type="button" className="btn google-sign-in w-full" disabled={isSubmitting} onClick={handleGoogleSignIn}><span className="google-mark" aria-hidden="true">G</span>{isSubmitting ? 'Connecting to Google...' : 'Continue with Google'}</button>
         <p className="google-account-note">First-time users receive a secure TTU Design Hub profile automatically.</p>
@@ -104,3 +109,4 @@ export default function Login() {
 }
 
 function ProfileContact({ profile, setProfile }) { return <><div className="form-group"><label>Email</label><input type="email" value={profile.email} onChange={e => setProfile({ ...profile, email: e.target.value })} /></div><div className="form-group"><label>Phone Number</label><input type="tel" value={profile.phone} onChange={e => setProfile({ ...profile, phone: e.target.value })} /></div><div className="form-group"><label>Department</label><input value={profile.department} onChange={e => setProfile({ ...profile, department: e.target.value })} /></div></>; }
+function AccessCodeField({ profile, setProfile }) { return <div className="form-group"><label>Role Registration Code</label><input type="password" value={profile.accessCode} onChange={e => setProfile({ ...profile, accessCode: e.target.value })} autoComplete="off" /></div>; }

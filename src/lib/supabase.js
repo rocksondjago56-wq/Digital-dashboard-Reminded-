@@ -33,12 +33,13 @@ export async function signInWithGoogle(profile = null) {
   if (!supabase) throw new Error('Supabase Google sign-in is not configured.');
 
   if (profile) sessionStorage.setItem('ttu_registration_profile', JSON.stringify(profile));
+  const { accessCode: _accessCode, ...safeProfile } = profile || {};
 
   const { error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
       redirectTo: getGoogleRedirectUrl(),
-      data: profile ? { registration_profile: profile } : undefined
+      data: profile?.role ? { registration_profile: safeProfile } : undefined
     }
   });
   if (error) throw error;

@@ -9,6 +9,16 @@ import { getVerifiedSupabaseUser } from '../services/supabase-auth.js';
 const router = Router();
 const prisma = new PrismaClient();
 
+function matchesRegistrationCode(role, providedCode) {
+  const expectedCode = role === 'lecturer'
+    ? process.env.LECTURER_REGISTRATION_CODE
+    : process.env.ADMIN_REGISTRATION_CODE;
+  if (!expectedCode || !providedCode) return false;
+  const expected = Buffer.from(expectedCode);
+  const provided = Buffer.from(providedCode);
+  return expected.length === provided.length && crypto.timingSafeEqual(expected, provided);
+}
+
 /**
  * Generate a JWT token for a user.
  */
@@ -64,16 +74,28 @@ router.post('/google-signin', async (req, res) => {
     const metadata = googleUser.user_metadata || {};
     const name = profile.fullName?.trim() || metadata.full_name || metadata.name || email.split('@')[0];
     const profilePictureUrl = metadata.avatar_url || metadata.picture || null;
-    const existingUser = await prisma.user.findUnique({ where: { email }, select: { role: true } });
+    const identityNumber = profile.identityNumber?.trim();
+    const userByEmail = await prisma.user.findUnique({ where: { email } });
+    const userByIdentity = identityNumber
+      ? await prisma.user.findUnique({ where: { staffId: identityNumber } })
+      : null;
+    if (identityNumber && (!userByIdentity || userByIdentity.email !== email)) {
+      return res.status(403).json({ error: 'That Lecturer ID or Staff ID is not linked to this Google email.' });
+    }
+    const existingUser = userByEmail || userByIdentity;
     const requestedRole = ['student', 'lecturer', 'admin'].includes(profile.role) ? profile.role : null;
+    const hasRoleCode = requestedRole && requestedRole !== 'student'
+      ? matchesRegistrationCode(requestedRole, profile.accessCode)
+      : false;
     const isApprovedProfile = requestedRole === 'student'
-      || (existingUser && requestedRole === existingUser.role);
+      || (existingUser && requestedRole === existingUser.role)
+      || hasRoleCode;
     if (requestedRole && !isApprovedProfile) {
       return res.status(403).json({
-        error: 'Lecturer and administration accounts must be provisioned by a department administrator before Google sign-in.'
+        error: 'Enter the correct role registration code, or sign in with the Lecturer ID or Staff ID already linked to your Google email.'
       });
     }
-    const role = existingUser?.role || 'student';
+    const role = existingUser?.role || requestedRole || 'student';
     const courses = Array.isArray(profile.courses) ? profile.courses.filter(Boolean) : [];
 
     // Privileged roles come from a department-provisioned record, never from

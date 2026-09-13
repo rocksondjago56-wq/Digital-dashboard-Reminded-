@@ -625,11 +625,17 @@ export const DbProvider = ({ children }) => {
 
     if (!googleUser?.email) return { success: false, message: 'Google did not provide an email address for this account.' };
     const accountRecords = getSavedUsers() || users;
-    const existingUser = accountRecords.find(user => user.email?.toLowerCase() === googleUser.email.toLowerCase());
+    const identityNumber = profile?.identityNumber?.trim();
+    const userByEmail = accountRecords.find(user => user.email?.toLowerCase() === googleUser.email.toLowerCase());
+    const userByIdentity = identityNumber ? accountRecords.find(user => user.staffId === identityNumber) : null;
+    if (identityNumber && (!userByIdentity || userByIdentity.email?.toLowerCase() !== googleUser.email.toLowerCase())) {
+      return { success: false, message: 'That Lecturer ID or Staff ID is not linked to this Google email.' };
+    }
+    const existingUser = userByEmail || userByIdentity;
     const requestedRole = ['student', 'lecturer', 'admin'].includes(profile?.role) ? profile.role : null;
     const isApprovedProfile = requestedRole === 'student' || (existingUser && requestedRole === existingUser.role);
     if (requestedRole && !isApprovedProfile) {
-      return { success: false, message: 'Lecturer and administration accounts must be provisioned by a department administrator before Google sign-in.' };
+      return { success: false, message: 'Secure lecturer and administration registration requires the deployed backend and a role registration code.' };
     }
     const registeredFields = isApprovedProfile && requestedRole ? {
       name: profile.fullName?.trim() || googleUser.user_metadata?.full_name || googleUser.user_metadata?.name || googleUser.email.split('@')[0],
