@@ -138,6 +138,22 @@ router.get('/role-management-access', authenticate, requireAdmin(), (req, res) =
   res.json({ success: true, allowed: canManageTestRoles(req.user) });
 });
 
+router.post('/registration-codes', authenticate, requireAdmin(), async (req, res) => {
+  try {
+    if (!canManageTestRoles(req.user)) return res.status(403).json({ error: 'Registration code generation is limited to the configured test administrator.' });
+    const { role, expiresInHours = 24 } = req.body;
+    if (!['student', 'lecturer', 'admin'].includes(role)) return res.status(400).json({ error: 'Choose student, lecturer, or admin.' });
+    const hours = Number(expiresInHours);
+    if (!Number.isFinite(hours) || hours < 1 || hours > 720) return res.status(400).json({ error: 'Expiration must be between 1 and 720 hours.' });
+    const code = `TTU-${crypto.randomBytes(5).toString('hex').toUpperCase()}`;
+    await prisma.registrationCode.create({ data: { codeHash: await bcrypt.hash(code, 12), role, expiresAt: new Date(Date.now() + hours * 60 * 60 * 1000), createdBy: req.user.id } });
+    res.status(201).json({ success: true, code, role, expiresAt: new Date(Date.now() + hours * 60 * 60 * 1000).toISOString() });
+  } catch (error) {
+    console.error('Registration code generation error:', error);
+    res.status(500).json({ error: 'Could not generate a registration code.' });
+  }
+});
+
 router.put('/:id/role', authenticate, requireAdmin(), async (req, res) => {
   try {
     if (!canManageTestRoles(req.user)) {

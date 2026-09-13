@@ -175,6 +175,8 @@ export const api = {
 
     roleManagementAccess: () => request('/users/role-management-access'),
 
+    createRegistrationCode: (role, expiresInHours) => request('/users/registration-codes', { method: 'POST', body: JSON.stringify({ role, expiresInHours }) }),
+
     updateRole: (id, role) =>
       request(`/users/${id}/role`, {
         method: 'PUT',

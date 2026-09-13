@@ -1189,6 +1189,15 @@ export const DbProvider = ({ children }) => {
     return { success: true };
   };
 
+  const createRegistrationCode = async (role, expiresInHours) => {
+    if (!useApi || !canManageTestRoles) return { success: false, message: 'Registration-code generation requires the configured backend administrator.' };
+    try {
+      return await api.users.createRegistrationCode(role, expiresInHours);
+    } catch (error) {
+      return { success: false, message: error.message };
+    }
+  };
+
   const deleteUser = async (userId) => {
     const isSelf = currentUser && currentUser.id === userId;
 
@@ -1264,6 +1273,7 @@ export const DbProvider = ({ children }) => {
       provisionIdentity,
       provisionIdentities,
       updateUserProfilePic,
+      createRegistrationCode,
       deleteUser,
       markAllNotificationsAsRead
     }}>

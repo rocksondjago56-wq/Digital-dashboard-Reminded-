@@ -4,19 +4,19 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { authenticate } from '../middleware/auth.js';
-import { getVerifiedSupabaseUser } from '../services/supabase-auth.js';
+import { getSupabaseProfile, getVerifiedSupabaseUser, updateSupabaseProfileRole } from '../services/supabase-auth.js';
 
 const router = Router();
 const prisma = new PrismaClient();
 
-function matchesRegistrationCode(role, providedCode) {
-  const expectedCode = role === 'lecturer'
-    ? process.env.LECTURER_REGISTRATION_CODE
-    : process.env.ADMIN_REGISTRATION_CODE;
-  if (!expectedCode || !providedCode) return false;
-  const expected = Buffer.from(expectedCode);
-  const provided = Buffer.from(providedCode);
-  return expected.length === provided.length && crypto.timingSafeEqual(expected, provided);
+async function consumeRegistrationCode(code, role, userId) {
+  if (!code || !role) return false;
+  const candidates = await prisma.registrationCode.findMany({ where: { role, usedAt: null, expiresAt: { gt: new Date() } } });
+  const match = await Promise.all(candidates.map(async candidate => (await bcrypt.compare(code, candidate.codeHash)) ? candidate : null));
+  const registrationCode = match.find(Boolean);
+  if (!registrationCode) return false;
+  await prisma.registrationCode.update({ where: { id: registrationCode.id }, data: { usedAt: new Date(), usedBy: userId } });
+  return true;
 }
 
 /**
@@ -71,31 +71,32 @@ router.post('/google-signin', async (req, res) => {
     if (profile.email?.trim() && profile.email.trim().toLowerCase() !== email) {
       return res.status(400).json({ error: 'Use the same Google email address entered during registration.' });
     }
+    let supabaseProfile = await getSupabaseProfile(accessToken, email);
+    if (!supabaseProfile) return res.status(404).json({ error: 'Profile not found, contact administrator.' });
     const metadata = googleUser.user_metadata || {};
     const name = profile.fullName?.trim() || metadata.full_name || metadata.name || email.split('@')[0];
     const profilePictureUrl = metadata.avatar_url || metadata.picture || null;
     const identityNumber = profile.identityNumber?.trim();
-    const userByEmail = await prisma.user.findUnique({ where: { email } });
     const userByIdentity = identityNumber
       ? await prisma.user.findUnique({ where: { staffId: identityNumber } })
       : null;
     if (identityNumber && (!userByIdentity || userByIdentity.email !== email)) {
       return res.status(403).json({ error: 'That Lecturer ID or Staff ID is not linked to this Google email.' });
     }
-    const existingUser = userByEmail || userByIdentity;
     const requestedRole = ['student', 'lecturer', 'admin'].includes(profile.role) ? profile.role : null;
-    const hasRoleCode = requestedRole && requestedRole !== 'student'
-      ? matchesRegistrationCode(requestedRole, profile.accessCode)
-      : false;
-    const isApprovedProfile = requestedRole === 'student'
-      || (existingUser && requestedRole === existingUser.role)
-      || hasRoleCode;
-    if (requestedRole && !isApprovedProfile) {
+    if (!supabaseProfile.role && requestedRole && await consumeRegistrationCode(profile.accessCode, requestedRole, supabaseProfile.id)) {
+      supabaseProfile = await updateSupabaseProfileRole(supabaseProfile.id, requestedRole);
+    }
+    if (!supabaseProfile.role || !['student', 'lecturer', 'admin'].includes(supabaseProfile.role)) {
+      return res.status(404).json({ error: 'Profile not found, contact administrator.' });
+    }
+    const isApprovedProfile = !requestedRole || requestedRole === supabaseProfile.role;
+    if (!isApprovedProfile) {
       return res.status(403).json({
-        error: 'Enter the correct role registration code, or sign in with the Lecturer ID or Staff ID already linked to your Google email.'
+        error: 'The registration role does not match the activated Supabase profile.'
       });
     }
-    const role = existingUser?.role || requestedRole || 'student';
+    const role = supabaseProfile.role;
     const courses = Array.isArray(profile.courses) ? profile.courses.filter(Boolean) : [];
 
     // Privileged roles come from a department-provisioned record, never from

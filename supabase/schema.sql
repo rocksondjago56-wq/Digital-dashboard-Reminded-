@@ -8,7 +8,7 @@ create table public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   name text not null,
   email text not null unique,
-  role public.user_role not null default 'student',
+  role public.user_role,
   department text not null default 'Graphic Design',
   year text,
   certificate text,
@@ -105,10 +105,7 @@ begin
     coalesce(nullif(new.raw_user_meta_data ->> 'name', ''), split_part(new.email, '@', 1)),
     new.email,
     nullif(new.raw_user_meta_data ->> 'phone', ''),
-    case
-      when requested = 'student_head' then 'student_head'::public.user_role
-      else 'student'::public.user_role
-    end,
+    null,
     nullif(new.raw_user_meta_data ->> 'year', ''),
     nullif(new.raw_user_meta_data ->> 'certificate', ''),
     nullif(new.raw_user_meta_data ->> 'student_id', ''),
@@ -141,6 +138,19 @@ $$;
 
 create trigger protect_profile_role
   before update on public.profiles for each row execute procedure public.prevent_self_role_change();
+
+-- Profiles created by Google OAuth start without a role. The backend activates
+-- a role only after an administrator-issued registration code is redeemed.
+create table public.registration_codes (
+  id uuid primary key default gen_random_uuid(),
+  code_hash text not null unique,
+  role public.user_role not null check (role in ('student', 'lecturer', 'admin')),
+  expires_at timestamptz not null,
+  used_at timestamptz,
+  used_by uuid references public.profiles(id) on delete set null,
+  created_by uuid references public.profiles(id) on delete restrict,
+  created_at timestamptz not null default now()
+);
 
 create or replace function public.is_staff()
 returns boolean language sql stable security definer set search_path = public as $$

@@ -34,12 +34,26 @@ export default function AdminDashboard() {
     deleteClassWhatsAppGroup,
     updateUserRole,
     canManageTestRoles,
+    createRegistrationCode,
     provisionIdentity,
     provisionIdentities,
     deleteUser
   } = useContext(DbContext);
 
   const [adminTab, setAdminTab] = useState('announcements'); // announcements, events, deadlines, timetable, whatsapp, users
+  const [registrationRole, setRegistrationRole] = useState('student');
+  const [registrationHours, setRegistrationHours] = useState('24');
+  const [generatedRegistrationCode, setGeneratedRegistrationCode] = useState('');
+  const [registrationCodeError, setRegistrationCodeError] = useState('');
+
+  const handleRegistrationCode = async (event) => {
+    event.preventDefault();
+    setRegistrationCodeError('');
+    setGeneratedRegistrationCode('');
+    const result = await createRegistrationCode(registrationRole, registrationHours);
+    if (!result?.success) return setRegistrationCodeError(result?.message || 'Could not generate a registration code.');
+    setGeneratedRegistrationCode(`${result.code} - expires ${new Date(result.expiresAt).toLocaleString()}`);
+  };
 
   // Form toggles
   const [showForm, setShowForm] = useState(false);
@@ -968,6 +982,13 @@ export default function AdminDashboard() {
             <div className="tab-actions-row">
               <h3>Member Registration & Role Permissions</h3>
             </div>
+            {canManageTestRoles && <form className="admin-action-form" onSubmit={handleRegistrationCode}>
+              <h4>Generate Registration Code</h4>
+              <div className="form-grid"><div className="form-group"><label>Role</label><select value={registrationRole} onChange={event => setRegistrationRole(event.target.value)}><option value="student">Student</option><option value="lecturer">Lecturer</option><option value="admin">Administrator</option></select></div><div className="form-group"><label>Expires In (Hours)</label><input type="number" min="1" max="720" value={registrationHours} onChange={event => setRegistrationHours(event.target.value)} /></div></div>
+              <button className="btn btn-primary" type="submit">Generate Code</button>
+              {generatedRegistrationCode && <p className="admin-form-status">{generatedRegistrationCode}</p>}
+              {registrationCodeError && <p className="admin-form-error">{registrationCodeError}</p>}
+            </form>}
             
             <div className="users-table-container mt-2">
               <table className="admin-users-table">
