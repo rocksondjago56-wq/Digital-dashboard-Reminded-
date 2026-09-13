@@ -540,7 +540,7 @@ export default function AdminDashboard() {
                     >
                       📲 WhatsApp
                     </button>
-                    <button onClick={() => deleteAnnouncement(a.id)} className="btn-icon-danger">🗑️ Remove</button>
+                    <button onClick={() => deleteAnnouncement(a.id)} className="btn-icon-danger">Remove</button>
                   </div>
                 </div>
               ))}
@@ -629,7 +629,7 @@ export default function AdminDashboard() {
                     >
                       📲 WhatsApp
                     </button>
-                    <button onClick={() => deleteEvent(e.id)} className="btn-icon-danger">🗑️ Remove</button>
+                    <button onClick={() => deleteEvent(e.id)} className="btn-icon-danger">Remove</button>
                   </div>
                 </div>
               ))}
@@ -753,7 +753,7 @@ export default function AdminDashboard() {
                     >
                       📲 WhatsApp
                     </button>
-                    <button onClick={() => deleteDeadline(d.id)} className="btn-icon-danger">🗑️ Remove</button>
+                    <button onClick={() => deleteDeadline(d.id)} className="btn-icon-danger">Remove</button>
                   </div>
                 </div>
               ))}

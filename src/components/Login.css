@@ -149,6 +149,7 @@
 .text-link { margin-top: 16px; padding: 0; border: 0; background: transparent; color: var(--ttu-blue-vibrant); font: inherit; font-weight: 600; text-decoration: underline; cursor: pointer; }
 
 .google-login-card { max-width: 500px; }
+.google-login-card .login-header h1 { color: #003b7a; font-weight: 800; }
 .verification-check { width: 74px; height: 74px; margin: 0 auto 22px; display: grid; place-items: center; border-radius: 50%; background: #dcfce7; border: 1px solid #86efac; color: #15803d; font-size: 2.5rem; font-weight: 800; }
 .verified-card { text-align: center; max-width: 460px; }
 .verified-card h1 { font-size: 1.55rem; }

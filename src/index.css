@@ -109,12 +109,12 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 a {
-  color: var(--ttu-blue-vibrant);
+  color: #003b7a;
   text-decoration: none;
   transition: var(--transition-smooth);
 }
 a:hover {
-  color: var(--ttu-blue);
+  color: #001f4d;
 }
 
 /* Glassmorphism / Clean Cards */

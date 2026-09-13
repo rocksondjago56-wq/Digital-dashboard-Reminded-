@@ -31,7 +31,7 @@
 }
 
 .metric-icon {
-  font-size: 2rem;
+  display: none;
   background: #eff6ff;
   width: 55px;
   height: 55px;
@@ -42,6 +42,8 @@
   border: 1px solid #bfdbfe;
   color: #004085;
 }
+
+.metric-card .metric-icon { display: none; }
 
 .metric-details {
   display: flex;
