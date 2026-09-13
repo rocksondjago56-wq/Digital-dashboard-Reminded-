@@ -34,9 +34,21 @@ export default function Login() {
       if (!session?.access_token || handledSession.current || googleVerificationPending) return;
       handledSession.current = true;
       setIsSubmitting(true);
+      const metadata = session.user?.user_metadata || {};
       const savedProfile = JSON.parse(sessionStorage.getItem('ttu_registration_profile') || 'null')
-        || session.user?.user_metadata?.registration_profile
-        || null;
+        || (metadata.requested_role ? {
+          role: metadata.requested_role,
+          fullName: metadata.name,
+          email: metadata.registration_email,
+          phone: metadata.phone,
+          year: metadata.year,
+          certificate: metadata.certificate,
+          indexNumber: metadata.student_id,
+          lecturerId: metadata.staff_id,
+          staffId: metadata.staff_id,
+          position: metadata.designation,
+          courses: metadata.requested_courses || []
+        } : null);
       if (savedProfile?.role) {
         const { accessCode: _accessCode, ...profileMetadata } = savedProfile;
         await saveSupabaseProfile(profileMetadata);

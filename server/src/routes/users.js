@@ -8,6 +8,14 @@ import { sendVerificationEmail } from '../services/email.js';
 const router = Router();
 const prisma = new PrismaClient();
 
+function canManageTestRoles(user) {
+  const allowedEmails = (process.env.TEST_ROLE_MANAGER_EMAILS || '')
+    .split(',')
+    .map(email => email.trim().toLowerCase())
+    .filter(Boolean);
+  return user?.role === 'admin' && allowedEmails.includes(user.email?.toLowerCase());
+}
+
 /**
  * GET /api/users
  * List all users (authenticated users).
@@ -126,8 +134,15 @@ router.post('/provision', authenticate, requireAdmin(), async (req, res) => {
  * PUT /api/users/:id/role
  * Update a user's role (admin only).
  */
+router.get('/role-management-access', authenticate, requireAdmin(), (req, res) => {
+  res.json({ success: true, allowed: canManageTestRoles(req.user) });
+});
+
 router.put('/:id/role', authenticate, requireAdmin(), async (req, res) => {
   try {
+    if (!canManageTestRoles(req.user)) {
+      return res.status(403).json({ error: 'Role management is limited to the configured test administrator.' });
+    }
     const { id } = req.params;
     const { role } = req.body;
 

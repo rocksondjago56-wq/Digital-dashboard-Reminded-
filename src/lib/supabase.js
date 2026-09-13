@@ -15,6 +15,19 @@ export const supabase = isSupabaseConfigured
 
 const LIVE_PORTAL_URL = 'https://digital-dashboard-reminded.vercel.app';
 
+const toProfileMetadata = (profile) => ({
+  requested_role: profile.role,
+  requested_courses: profile.courses || [],
+  name: profile.fullName,
+  registration_email: profile.email,
+  phone: profile.phone,
+  year: profile.year,
+  certificate: profile.certificate,
+  student_id: profile.indexNumber,
+  staff_id: profile.lecturerId || profile.staffId,
+  designation: profile.position
+});
+
 const getGoogleRedirectUrl = () => {
   const publicAppUrl = import.meta.env.VITE_PUBLIC_APP_URL?.replace(/\/$/, '');
   const isValidPublicUrl = publicAppUrl
@@ -39,7 +52,7 @@ export async function signInWithGoogle(profile = null) {
     provider: 'google',
     options: {
       redirectTo: getGoogleRedirectUrl(),
-      data: profile?.role ? { registration_profile: safeProfile } : undefined
+      data: profile?.role ? toProfileMetadata(safeProfile) : undefined
     }
   });
   if (error) throw error;

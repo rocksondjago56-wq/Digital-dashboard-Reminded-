@@ -33,6 +33,7 @@ export default function AdminDashboard() {
     saveClassWhatsAppGroup,
     deleteClassWhatsAppGroup,
     updateUserRole,
+    canManageTestRoles,
     provisionIdentity,
     provisionIdentities,
     deleteUser
@@ -997,7 +998,7 @@ export default function AdminDashboard() {
                         </span>
                       </td>
                       <td>
-                        <select 
+                        {canManageTestRoles ? <select
                           value={u.role} 
                           onChange={(e) => updateUserRole(u.id, e.target.value)}
                           className="user-role-select"
@@ -1006,7 +1007,7 @@ export default function AdminDashboard() {
                           <option value="student_head">Student Head</option>
                           <option value="lecturer">Lecturer</option>
                           <option value="admin">Administrator</option>
-                        </select>
+                        </select> : <span className="role-management-locked">Restricted</span>}
                       </td>
                       <td>
                         <button

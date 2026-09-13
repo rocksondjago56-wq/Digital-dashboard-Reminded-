@@ -173,6 +173,8 @@ export const api = {
   users: {
     list: () => request('/users'),
 
+    roleManagementAccess: () => request('/users/role-management-access'),
+
     updateRole: (id, role) =>
       request(`/users/${id}/role`, {
         method: 'PUT',

@@ -297,6 +297,7 @@ export const DbProvider = ({ children }) => {
   const [studentArchive, setStudentArchive] = useState([]);
   const [loading, setLoading] = useState(true);
   const [useApi, setUseApi] = useState(false); // true when backend is available
+  const [canManageTestRoles, setCanManageTestRoles] = useState(false);
   const [googleVerificationPending, setGoogleVerificationPending] = useState(false);
 
   useEffect(() => {
@@ -434,6 +435,15 @@ export const DbProvider = ({ children }) => {
     }
   }, []);
 
+  const refreshTestRoleManagementAccess = useCallback(async () => {
+    try {
+      const result = await api.users.roleManagementAccess();
+      setCanManageTestRoles(Boolean(result.allowed));
+    } catch {
+      setCanManageTestRoles(false);
+    }
+  }, []);
+
   // ─── Initialization ───────────────────────────────────────────────────
 
   useEffect(() => {
@@ -452,6 +462,7 @@ export const DbProvider = ({ children }) => {
             const meResult = await api.auth.me();
             if (meResult.success) {
               setCurrentUser(meResult.user);
+              if (meResult.user.role === 'admin') await refreshTestRoleManagementAccess();
             }
           } catch {
             clearToken(); // Token expired or invalid
@@ -536,7 +547,7 @@ export const DbProvider = ({ children }) => {
     };
 
     init();
-  }, [refreshRemoteData]);
+  }, [refreshRemoteData, refreshTestRoleManagementAccess]);
 
   // ─── Auth Operations ──────────────────────────────────────────────────
 
@@ -559,6 +570,7 @@ export const DbProvider = ({ children }) => {
         if (result.success) {
           setToken(result.token);
           setCurrentUser(result.user);
+          if (result.user.role === 'admin') await refreshTestRoleManagementAccess();
           await refreshRemoteData();
           addNotification(`User ${result.user.name} logged in successfully.`);
           return { success: true, user: result.user };
@@ -612,6 +624,7 @@ export const DbProvider = ({ children }) => {
         if (result.success) {
           setToken(result.token);
           setCurrentUser(result.user);
+          if (result.user.role === 'admin') await refreshTestRoleManagementAccess();
           setGoogleVerificationPending(true);
           await refreshRemoteData();
           addNotification(`User ${result.user.name} signed in with Google.`);
@@ -684,6 +697,7 @@ export const DbProvider = ({ children }) => {
       addNotification(`User ${currentUser.name} logged out.`);
     }
     clearToken();
+    setCanManageTestRoles(false);
     signOutOfGoogle().catch(() => {});
     localStorage.removeItem(CURRENT_USER_STORAGE_KEY);
     setCurrentUser(null);
@@ -1222,6 +1236,7 @@ export const DbProvider = ({ children }) => {
       timetable,
       classGroups,
       loading,
+      canManageTestRoles,
       googleVerificationPending,
       login,
       googleSignIn,
