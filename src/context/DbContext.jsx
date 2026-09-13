@@ -626,23 +626,42 @@ export const DbProvider = ({ children }) => {
     if (!googleUser?.email) return { success: false, message: 'Google did not provide an email address for this account.' };
     const accountRecords = getSavedUsers() || users;
     const existingUser = accountRecords.find(user => user.email?.toLowerCase() === googleUser.email.toLowerCase());
+    const requestedRole = ['student', 'lecturer', 'admin'].includes(profile?.role) ? profile.role : null;
+    const isApprovedProfile = requestedRole === 'student' || (existingUser && requestedRole === existingUser.role);
+    if (requestedRole && !isApprovedProfile) {
+      return { success: false, message: 'Lecturer and administration accounts must be provisioned by a department administrator before Google sign-in.' };
+    }
+    const registeredFields = isApprovedProfile && requestedRole ? {
+      name: profile.fullName?.trim() || googleUser.user_metadata?.full_name || googleUser.user_metadata?.name || googleUser.email.split('@')[0],
+      department: profile.department || 'Graphic Design',
+      certificate: requestedRole === 'student' ? profile.certificate || 'BTech' : undefined,
+      year: requestedRole === 'student' ? profile.year || 'Year 1' : undefined,
+      studentId: requestedRole === 'student' ? profile.indexNumber || '' : '',
+      indexNumber: requestedRole === 'student' ? profile.indexNumber || '' : '',
+      staffId: requestedRole === 'student' ? '' : (profile.staffId || profile.lecturerId || ''),
+      phone: profile.phone || '',
+      designation: requestedRole === 'admin' ? profile.position || '' : '',
+      courses: requestedRole === 'lecturer' ? profile.courses || [] : []
+    } : {};
     const user = existingUser ? {
       ...existingUser,
+      ...registeredFields,
       isVerified: true,
       profilePic: googleUser.user_metadata?.avatar_url || googleUser.user_metadata?.picture || existingUser.profilePic
     } : {
       id: `google-${googleUser.id}`,
       name: googleUser.user_metadata?.full_name || googleUser.user_metadata?.name || googleUser.email.split('@')[0],
       email: googleUser.email.toLowerCase(),
-      role: profile?.role || 'student',
-      department: profile?.department || 'Graphic Design',
-      certificate: profile?.certificate || 'BTech',
-      year: profile?.year || 'Year 1',
-      studentId: profile?.indexNumber || `04${Math.floor(10000000 + Math.random() * 90000000)}`,
-      staffId: profile?.staffId || profile?.lecturerId || '',
-      phone: profile?.phone || '',
-      designation: profile?.position || '',
-      courses: profile?.courses || [],
+      ...registeredFields,
+      role: 'student',
+      department: registeredFields.department || 'Graphic Design',
+      certificate: registeredFields.certificate || 'BTech',
+      year: registeredFields.year || 'Year 1',
+      studentId: registeredFields.studentId || `04${Math.floor(10000000 + Math.random() * 90000000)}`,
+      staffId: registeredFields.staffId || '',
+      phone: registeredFields.phone || '',
+      designation: registeredFields.designation || '',
+      courses: registeredFields.courses || [],
       profilePic: googleUser.user_metadata?.avatar_url || googleUser.user_metadata?.picture || '',
       isVerified: true,
       completedDeadlines: []

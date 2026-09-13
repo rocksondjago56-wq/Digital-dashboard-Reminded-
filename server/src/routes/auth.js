@@ -64,8 +64,30 @@ router.post('/google-signin', async (req, res) => {
     const metadata = googleUser.user_metadata || {};
     const name = profile.fullName?.trim() || metadata.full_name || metadata.name || email.split('@')[0];
     const profilePictureUrl = metadata.avatar_url || metadata.picture || null;
-    const role = ['student', 'lecturer', 'admin'].includes(profile.role) ? profile.role : 'student';
+    const existingUser = await prisma.user.findUnique({ where: { email }, select: { role: true } });
+    const requestedRole = ['student', 'lecturer', 'admin'].includes(profile.role) ? profile.role : null;
+    const isApprovedProfile = requestedRole === 'student'
+      || (existingUser && requestedRole === existingUser.role);
+    if (requestedRole && !isApprovedProfile) {
+      return res.status(403).json({
+        error: 'Lecturer and administration accounts must be provisioned by a department administrator before Google sign-in.'
+      });
+    }
+    const role = existingUser?.role || 'student';
     const courses = Array.isArray(profile.courses) ? profile.courses.filter(Boolean) : [];
+
+    // Privileged roles come from a department-provisioned record, never from
+    // an unauthenticated registration form.
+    const registrationFields = isApprovedProfile && requestedRole ? {
+      department: profile.department?.trim() || 'Graphic Design',
+      year: requestedRole === 'student' ? profile.year || 'Year 1' : null,
+      certificate: requestedRole === 'student' ? profile.certificate || 'BTech' : null,
+      studentId: requestedRole === 'student' ? profile.indexNumber?.trim() || null : null,
+      staffId: requestedRole === 'student' ? null : (profile.lecturerId || profile.staffId || null),
+      phone: profile.phone?.trim() || null,
+      designation: requestedRole === 'admin' ? profile.position?.trim() || null : null,
+      courses: requestedRole === 'lecturer' ? courses : []
+    } : {};
 
     const user = await prisma.user.upsert({
       where: { email },
@@ -73,22 +95,15 @@ router.post('/google-signin', async (req, res) => {
         name,
         profilePictureUrl: profilePictureUrl || undefined,
         isVerified: true,
-        phone: profile.phone?.trim() || undefined,
-        department: profile.department?.trim() || undefined
+        ...registrationFields
       },
       create: {
         name,
         email,
         passwordHash: await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 12),
         role,
-        department: profile.department?.trim() || 'Graphic Design',
-        year: role === 'student' ? profile.year || 'Year 1' : null,
-        certificate: role === 'student' ? profile.certificate || 'BTech' : null,
-        studentId: role === 'student' ? profile.indexNumber?.trim() || `04${Math.floor(10000000 + Math.random() * 90000000)}` : null,
-        staffId: role === 'student' ? null : (profile.lecturerId || profile.staffId || null),
-        phone: profile.phone?.trim() || null,
-        designation: role === 'admin' ? profile.position?.trim() || null : null,
-        courses: role === 'lecturer' ? courses : [],
+        ...registrationFields,
+        studentId: role === 'student' ? registrationFields.studentId || `04${Math.floor(10000000 + Math.random() * 90000000)}` : null,
         profilePictureUrl,
         isVerified: true
       }
