@@ -19,7 +19,7 @@ export default function WhatsAppWidget() {
     deleteClassWhatsAppGroup
   } = useContext(DbContext);
   const [isOpen, setIsOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('chat'); // 'chat', 'groups', 'broadcast', 'settings'
+  const [activeTab, setActiveTab] = useState('groups'); // 'chat', 'groups', 'broadcast', 'settings'
   const [config, setConfig] = useState(getWhatsAppConfig());
 
   // Custom broadcast message state

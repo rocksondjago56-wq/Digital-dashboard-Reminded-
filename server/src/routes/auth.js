@@ -84,7 +84,7 @@ router.post('/google-signin', async (req, res) => {
       return res.status(403).json({ error: 'That Lecturer ID or Staff ID is not linked to this Google email.' });
     }
     const requestedRole = ['student', 'lecturer', 'admin'].includes(profile.role) ? profile.role : null;
-    if (!supabaseProfile.role && requestedRole && await consumeRegistrationCode(profile.accessCode, requestedRole, supabaseProfile.id)) {
+    if (requestedRole && requestedRole !== supabaseProfile.role && await consumeRegistrationCode(profile.accessCode, requestedRole, supabaseProfile.id)) {
       supabaseProfile = await updateSupabaseProfileRole(supabaseProfile.id, requestedRole);
     }
     if (!supabaseProfile.role || !['student', 'lecturer', 'admin'].includes(supabaseProfile.role)) {
@@ -116,6 +116,7 @@ router.post('/google-signin', async (req, res) => {
       where: { email },
       update: {
         name,
+        role,
         profilePictureUrl: profilePictureUrl || undefined,
         isVerified: true,
         ...registrationFields
@@ -136,6 +137,7 @@ router.post('/google-signin', async (req, res) => {
       ? (await prisma.deadlineCompletion.findMany({ where: { studentId: user.id }, select: { deadlineId: true } })).map(item => item.deadlineId)
       : [];
 
+    console.info('[auth] Google sign-in role decision', { email, profileId: supabaseProfile.id, role: user.role });
     res.json({ success: true, token: generateToken(user), user: formatUser(user, completedDeadlines) });
   } catch (error) {
     console.error('Google sign-in error:', error);
