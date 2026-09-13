@@ -16,7 +16,11 @@ export const supabase = isSupabaseConfigured
 const getGoogleRedirectUrl = () => {
   const publicAppUrl = import.meta.env.VITE_PUBLIC_APP_URL?.replace(/\/$/, '');
   if (publicAppUrl) return `${publicAppUrl}/`;
-  return `${window.location.origin}/`;
+
+  const isLocalHost = ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname);
+  return isLocalHost
+    ? 'https://digital-dashboard-reminded.vercel.app/'
+    : `${window.location.origin}/`;
 };
 
 export async function signInWithGoogle(profile = null) {
@@ -26,7 +30,10 @@ export async function signInWithGoogle(profile = null) {
 
   const { error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
-    options: { redirectTo: getGoogleRedirectUrl(), data: profile || undefined }
+    options: {
+      redirectTo: getGoogleRedirectUrl(),
+      data: profile ? { registration_profile: profile } : undefined
+    }
   });
   if (error) throw error;
 }
