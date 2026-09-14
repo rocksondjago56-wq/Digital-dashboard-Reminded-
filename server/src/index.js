@@ -18,7 +18,14 @@ import timetableRoutes from './routes/timetable.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-const allowedOrigins = (process.env.CLIENT_ORIGIN || 'http://localhost:5173,http://localhost:5174,http://localhost:3000')
+const defaultClientOrigins = [
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://localhost:3000',
+  'https://digital-dashboard-reminded.vercel.app',
+  'https://digital-dashboard-reminded-6dbz.vercel.app'
+].join(',');
+const allowedOrigins = (process.env.CLIENT_ORIGIN || defaultClientOrigins)
   .split(',')
   .map(origin => origin.trim())
   .filter(Boolean);
