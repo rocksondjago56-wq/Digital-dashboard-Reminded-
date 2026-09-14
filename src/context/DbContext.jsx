@@ -617,7 +617,7 @@ export const DbProvider = ({ children }) => {
     return { success: false, message: 'Account not found. Use your email, mobile number, full name, index number, or staff ID.' };
   };
 
-  const googleSignIn = async (accessToken, googleUser, profile = null) => {
+  const googleSignIn = async (accessToken, _googleUser, profile = null) => {
     if (useApi) {
       try {
         const result = await api.auth.googleSignIn(accessToken, profile);
@@ -632,64 +632,18 @@ export const DbProvider = ({ children }) => {
         }
         return { success: false, message: result.error || 'Google sign-in failed.' };
       } catch (error) {
-        if (!googleUser?.email) return { success: false, message: error.message };
+        return { success: false, message: error.message || 'The secure TTU sign-in service is unavailable. Please try again.' };
       }
     }
 
-    if (!googleUser?.email) return { success: false, message: 'Google did not provide an email address for this account.' };
-    const accountRecords = getSavedUsers() || users;
-    const identityNumber = profile?.identityNumber?.trim();
-    const userByEmail = accountRecords.find(user => user.email?.toLowerCase() === googleUser.email.toLowerCase());
-    const userByIdentity = identityNumber ? accountRecords.find(user => user.staffId === identityNumber) : null;
-    if (identityNumber && (!userByIdentity || userByIdentity.email?.toLowerCase() !== googleUser.email.toLowerCase())) {
-      return { success: false, message: 'That Lecturer ID or Staff ID is not linked to this Google email.' };
-    }
-    const existingUser = userByEmail || userByIdentity;
-    const requestedRole = ['student', 'lecturer', 'admin'].includes(profile?.role) ? profile.role : null;
-    const isApprovedProfile = requestedRole === 'student' || (existingUser && requestedRole === existingUser.role);
-    if (requestedRole && !isApprovedProfile) {
-      return { success: false, message: 'Secure lecturer and administration registration requires the deployed backend and a role registration code.' };
-    }
-    const registeredFields = isApprovedProfile && requestedRole ? {
-      name: profile.fullName?.trim() || googleUser.user_metadata?.full_name || googleUser.user_metadata?.name || googleUser.email.split('@')[0],
-      department: profile.department || 'Graphic Design',
-      certificate: requestedRole === 'student' ? profile.certificate || 'BTech' : undefined,
-      year: requestedRole === 'student' ? profile.year || 'Year 1' : undefined,
-      studentId: requestedRole === 'student' ? profile.indexNumber || '' : '',
-      indexNumber: requestedRole === 'student' ? profile.indexNumber || '' : '',
-      staffId: requestedRole === 'student' ? '' : (profile.staffId || profile.lecturerId || ''),
-      phone: profile.phone || '',
-      designation: requestedRole === 'admin' ? profile.position || '' : '',
-      courses: requestedRole === 'lecturer' ? profile.courses || [] : []
-    } : {};
-    const user = existingUser ? {
-      ...existingUser,
-      ...registeredFields,
-      isVerified: true,
-      profilePic: googleUser.user_metadata?.avatar_url || googleUser.user_metadata?.picture || existingUser.profilePic
-    } : {
-      id: `google-${googleUser.id}`,
-      name: googleUser.user_metadata?.full_name || googleUser.user_metadata?.name || googleUser.email.split('@')[0],
-      email: googleUser.email.toLowerCase(),
-      ...registeredFields,
-      role: 'student',
-      department: registeredFields.department || 'Graphic Design',
-      certificate: registeredFields.certificate || 'BTech',
-      year: registeredFields.year || 'Year 1',
-      studentId: registeredFields.studentId || `04${Math.floor(10000000 + Math.random() * 90000000)}`,
-      staffId: registeredFields.staffId || '',
-      phone: registeredFields.phone || '',
-      designation: registeredFields.designation || '',
-      courses: registeredFields.courses || [],
-      profilePic: googleUser.user_metadata?.avatar_url || googleUser.user_metadata?.picture || '',
-      isVerified: true,
-      completedDeadlines: []
+    // Never fall back to browser storage for Google authentication. Doing so
+    // would bypass the Supabase profile role and can incorrectly show a
+    // student dashboard for a lecturer or administrator.
+    return {
+      success: false,
+      message: 'The secure TTU sign-in service is not connected. Configure and deploy the backend, then set VITE_API_BASE to its public API URL.'
     };
-    syncUsers([...accountRecords.filter(item => item.email?.toLowerCase() !== user.email), user]);
-    setCurrentUser(user);
-    setGoogleVerificationPending(true);
-    localStorage.setItem(CURRENT_USER_STORAGE_KEY, JSON.stringify(user));
-    return { success: true, user };
+
   };
 
   const logout = async () => {

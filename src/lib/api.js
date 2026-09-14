@@ -2,8 +2,8 @@
  * API Client for TTU Dashboard Backend.
  * Wraps fetch() with JWT token handling and error management.
  * 
- * When the backend is not running, requests will fail gracefully
- * and the app will fall back to localStorage mode.
+ * Role-based Google sign-in requires the backend so the Supabase profile role
+ * is always verified before any dashboard is opened.
  */
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3001/api';
