@@ -1,6 +1,6 @@
 -- Run this entire script in Supabase Dashboard -> SQL Editor before connecting the app.
--- New public registrations are intentionally created as students. Lecturer and
--- administrator accounts must be approved by a department administrator.
+-- New Google registrations start without a role. The backend activates a role
+-- only after student registration or an approved staff registration code.
 
 create type public.user_role as enum ('student', 'student_head', 'lecturer', 'admin');
 
@@ -139,8 +139,8 @@ $$;
 create trigger protect_profile_role
   before update on public.profiles for each row execute procedure public.prevent_self_role_change();
 
--- Profiles created by Google OAuth start without a role. The backend activates
--- a role only after an administrator-issued registration code is redeemed.
+-- Profiles created by Google OAuth start without a role. Students activate at
+-- registration; lecturer and administrator roles require an approved code.
 create table public.registration_codes (
   id uuid primary key default gen_random_uuid(),
   code_hash text not null unique,

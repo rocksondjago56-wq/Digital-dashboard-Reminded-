@@ -19,6 +19,12 @@ async function consumeRegistrationCode(code, role, userId) {
   return true;
 }
 
+function isDemoRegistrationCode(code, role) {
+  return process.env.DEMO_MODE === 'true'
+    && ['lecturer', 'admin'].includes(role)
+    && code === '0000';
+}
+
 /**
  * Generate a JWT token for a user.
  */
@@ -84,7 +90,13 @@ router.post('/google-signin', async (req, res) => {
       return res.status(403).json({ error: 'That Lecturer ID or Staff ID is not linked to this Google email.' });
     }
     const requestedRole = ['student', 'lecturer', 'admin'].includes(profile.role) ? profile.role : null;
-    if (requestedRole && requestedRole !== supabaseProfile.role && await consumeRegistrationCode(profile.accessCode, requestedRole, supabaseProfile.id)) {
+    if (!supabaseProfile.role && requestedRole) {
+      const canActivateRole = requestedRole === 'student'
+        || isDemoRegistrationCode(profile.accessCode, requestedRole)
+        || await consumeRegistrationCode(profile.accessCode, requestedRole, supabaseProfile.id);
+      if (!canActivateRole) {
+        return res.status(403).json({ error: 'A valid registration code is required for lecturer or administration accounts.' });
+      }
       supabaseProfile = await updateSupabaseProfileRole(supabaseProfile.id, requestedRole);
     }
     if (!supabaseProfile.role || !['student', 'lecturer', 'admin'].includes(supabaseProfile.role)) {
