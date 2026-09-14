@@ -34,21 +34,10 @@ export default function Login() {
       if (!session?.access_token || handledSession.current || googleVerificationPending) return;
       handledSession.current = true;
       setIsSubmitting(true);
-      const metadata = session.user?.user_metadata || {};
-      const savedProfile = JSON.parse(sessionStorage.getItem('ttu_registration_profile') || 'null')
-        || (metadata.requested_role ? {
-          role: metadata.requested_role,
-          fullName: metadata.name,
-          email: metadata.registration_email,
-          phone: metadata.phone,
-          year: metadata.year,
-          certificate: metadata.certificate,
-          indexNumber: metadata.student_id,
-          lecturerId: metadata.staff_id,
-          staffId: metadata.staff_id,
-          position: metadata.designation,
-          courses: metadata.requested_courses || []
-        } : null);
+      // Registration details apply only to the OAuth round trip that began on
+      // this device. Reusing stored Google metadata would make later sign-ins
+      // incorrectly look like a new lecturer/admin registration.
+      const savedProfile = JSON.parse(sessionStorage.getItem('ttu_registration_profile') || 'null');
       if (savedProfile?.role) {
         const { accessCode: _accessCode, ...profileMetadata } = savedProfile;
         await saveSupabaseProfile(profileMetadata);
