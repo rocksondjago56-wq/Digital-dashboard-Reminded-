@@ -52,15 +52,19 @@ export async function getSupabaseProfile(accessToken, email) {
  * key is being initialized.
  */
 export async function ensureSupabaseProfile(accessToken, googleUser) {
-  const email = googleUser.email?.trim().toLowerCase();
+  const user = (googleUser && typeof googleUser === 'object') ? (googleUser.user || googleUser) : {};
+  const email = user?.email?.trim().toLowerCase() || '';
+  if (!email) {
+    return { id: user?.id || 'unknown', email: '', role: null, name: 'TTU Member', profile_picture_url: null };
+  }
   const existing = await getSupabaseProfile(accessToken, email);
   if (existing) return existing;
 
   const { url } = getSupabaseConfig();
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const metadata = googleUser.user_metadata || {};
+  const metadata = user.user_metadata || {};
   const fallbackProfile = {
-    id: googleUser.id,
+    id: user.id || 'unknown',
     email,
     name: metadata.full_name || metadata.name || email.split('@')[0],
     role: null,

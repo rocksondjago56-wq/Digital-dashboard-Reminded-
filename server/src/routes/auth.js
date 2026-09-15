@@ -44,9 +44,11 @@ function formatUser(user, completedDeadlines = []) {
   };
 }
 
-async function exchangePasswordAccount(accessToken, profile = {}) {
-  const authUser = await getVerifiedSupabaseUser(accessToken);
-  if (!authUser.email) throw new Error('A verified Supabase email/password session is required.');
+async function exchangePasswordAccount(accessToken, rawProfile = {}) {
+  const profile = (rawProfile && typeof rawProfile === 'object') ? rawProfile : {};
+  const rawAuthUser = await getVerifiedSupabaseUser(accessToken);
+  const authUser = (rawAuthUser?.user || rawAuthUser);
+  if (!authUser || !authUser.email) throw new Error('A verified Supabase email/password session is required.');
   const email = authUser.email.trim().toLowerCase();
   if (profile.email?.trim() && profile.email.trim().toLowerCase() !== email) {
     throw new Error('Use the same email address used during registration.');
@@ -121,10 +123,12 @@ router.post('/password-signin', async (req, res) => {
  */
 router.post('/google-signin', async (req, res) => {
   try {
-    const { accessToken, profile = {} } = req.body;
-    const googleUser = await getVerifiedSupabaseUser(accessToken);
-    const hasGoogleProvider = googleUser.app_metadata?.providers?.includes('google');
-    if (!hasGoogleProvider || !googleUser.email) {
+    const { accessToken, profile: rawProfile } = req.body;
+    const profile = (rawProfile && typeof rawProfile === 'object') ? rawProfile : {};
+    const rawGoogleUser = await getVerifiedSupabaseUser(accessToken);
+    const googleUser = (rawGoogleUser?.user || rawGoogleUser);
+    const hasGoogleProvider = googleUser?.app_metadata?.providers?.includes('google');
+    if (!hasGoogleProvider || !googleUser?.email) {
       return res.status(403).json({ error: 'Continue with Google is required to access the portal.' });
     }
 

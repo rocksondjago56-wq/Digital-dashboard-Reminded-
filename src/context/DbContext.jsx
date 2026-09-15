@@ -615,7 +615,8 @@ export const DbProvider = ({ children }) => {
     return { success: false, message: 'Account not found. Use your email, mobile number, full name, index number, or staff ID.' };
   };
 
-  const googleSignIn = async (accessToken, _googleUser, profile = null) => {
+  const googleSignIn = async (accessToken, _googleUser, rawProfile = {}) => {
+    const profile = (rawProfile && typeof rawProfile === 'object') ? rawProfile : {};
     let backendReady = useApi;
     if (!backendReady) {
       backendReady = await isApiAvailable();
@@ -650,7 +651,8 @@ export const DbProvider = ({ children }) => {
 
   };
 
-  const passwordPortalSignIn = async (accessToken, profile = null) => {
+  const passwordPortalSignIn = async (accessToken, rawProfile = {}) => {
+    const profile = (rawProfile && typeof rawProfile === 'object') ? rawProfile : {};
     let backendReady = useApi;
     if (!backendReady) {
       backendReady = await isApiAvailable();

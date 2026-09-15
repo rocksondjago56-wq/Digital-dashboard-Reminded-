@@ -16,17 +16,17 @@ export const supabase = isSupabaseConfigured
 const LIVE_PORTAL_URL = 'https://digital-dashboard-reminded.vercel.app';
 
 const toProfileMetadata = (profile) => ({
-  requested_role: profile.role,
-  requested_courses: profile.courses || [],
-  name: profile.fullName,
-  registration_email: profile.email,
-  phone: profile.phone,
-  program: profile.program,
-  year: profile.year,
-  certificate: profile.certificate,
-  student_id: profile.indexNumber,
-  staff_id: profile.lecturerId || profile.staffId,
-  designation: profile.position
+  requested_role: profile?.role || 'student',
+  requested_courses: profile?.courses || [],
+  name: profile?.fullName || '',
+  registration_email: profile?.email || '',
+  phone: profile?.phone || '',
+  program: profile?.program || '',
+  year: profile?.year || '',
+  certificate: profile?.certificate || '',
+  student_id: profile?.indexNumber || '',
+  staff_id: profile?.lecturerId || profile?.staffId || '',
+  designation: profile?.position || ''
 });
 
 const getGoogleRedirectUrl = () => {

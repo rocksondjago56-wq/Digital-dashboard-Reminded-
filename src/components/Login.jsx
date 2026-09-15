@@ -26,7 +26,8 @@ export default function Login() {
       if (!session?.access_token || !isGoogleSession || handledGoogleSession.current || googleVerificationPending) return;
       handledGoogleSession.current = true;
       setIsSubmitting(true);
-      const savedProfile = JSON.parse(sessionStorage.getItem('ttu_registration_profile') || 'null');
+      const rawSavedProfile = JSON.parse(sessionStorage.getItem('ttu_registration_profile') || 'null');
+      const savedProfile = (rawSavedProfile && typeof rawSavedProfile === 'object') ? rawSavedProfile : {};
       if (savedProfile?.role) {
         const { accessCode: _accessCode, password: _password, ...metadata } = savedProfile;
         await saveSupabaseProfile(metadata);
