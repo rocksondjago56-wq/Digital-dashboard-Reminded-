@@ -37,10 +37,14 @@ export default function Login() {
       if (!result.success) {
         setError(result.message || 'Your Google account could not be linked to the TTU portal.');
         handledGoogleSession.current = false;
+        signOutOfGoogle().catch(() => {});
       }
       setIsSubmitting(false);
     };
-    restoreGoogleSession().catch(() => setError('Could not restore your Google session. Please try again.'));
+    restoreGoogleSession().catch(() => {
+      setError('Could not restore your Google session. Please try again.');
+      signOutOfGoogle().catch(() => {});
+    });
   }, [googleSignIn, googleVerificationPending]);
 
   const handlePasswordSubmit = async (event) => {
