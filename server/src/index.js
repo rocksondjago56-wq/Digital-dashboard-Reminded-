@@ -24,15 +24,38 @@ const defaultClientOrigins = [
   'http://localhost:3000',
   'https://digital-dashboard-reminded.vercel.app',
   'https://digital-dashboard-reminded-6dbz.vercel.app'
-].join(',');
-const allowedOrigins = (process.env.CLIENT_ORIGIN || defaultClientOrigins)
+];
+const configuredOrigins = (process.env.CLIENT_ORIGIN || '')
   .split(',')
-  .map(origin => origin.trim())
+  .map(origin => origin.trim().replace(/\/$/, ''))
   .filter(Boolean);
+
+const isOriginAllowed = (origin) => {
+  if (!origin) return true;
+  const cleanOrigin = origin.trim().replace(/\/$/, '');
+  if (defaultClientOrigins.includes(cleanOrigin) || configuredOrigins.includes(cleanOrigin)) {
+    return true;
+  }
+  // Allow any Vercel production or preview deployment for this project
+  if (/^https:\/\/digital-dashboard-reminded.*\.vercel\.app$/i.test(cleanOrigin)) {
+    return true;
+  }
+  // Allow local development hostnames
+  if (/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(cleanOrigin)) {
+    return true;
+  }
+  return false;
+};
 
 // Middleware
 app.use(cors({
-  origin: allowedOrigins,
+  origin: (origin, callback) => {
+    if (isOriginAllowed(origin)) {
+      callback(null, true);
+    } else {
+      callback(null, false);
+    }
+  },
   credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));

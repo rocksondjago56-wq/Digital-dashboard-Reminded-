@@ -598,15 +598,13 @@ export const DbProvider = ({ children }) => {
     if (user) {
       const expectedPassword = user.password || `${user.role}123`;
       if (password === expectedPassword) {
-        if (!user.isVerified) {
-          return { success: false, message: 'This account now uses Google sign-in. Select Continue with Google to access the portal.' };
-        }
         const updatedUsers = [
           ...accountRecords.filter(u => u.email?.toLowerCase() !== user.email.toLowerCase()),
           user
         ];
         syncUsers(updatedUsers);
         setCurrentUser(user);
+        setGoogleVerificationPending(false);
         localStorage.setItem(CURRENT_USER_STORAGE_KEY, JSON.stringify(user));
         addNotification(`User ${user.name} logged in successfully.`);
         return { success: true, user };
@@ -618,15 +616,18 @@ export const DbProvider = ({ children }) => {
   };
 
   const googleSignIn = async (accessToken, _googleUser, profile = null) => {
-    // Render services can wake after the app initializes, so recheck the
-    // configured backend immediately before reporting an unavailable service.
-    const backendReady = useApi || await isApiAvailable();
+    let backendReady = useApi;
+    if (!backendReady) {
+      backendReady = await isApiAvailable();
+    }
+    if (!backendReady) {
+      await new Promise(res => setTimeout(res, 2000));
+      backendReady = await isApiAvailable();
+    }
     if (!backendReady) {
       return {
         success: false,
-        message: isApiConfigured
-          ? 'The secure TTU sign-in service is temporarily unavailable. Please try again shortly.'
-          : 'The secure TTU sign-in service is not connected. Configure and deploy the backend, then set VITE_API_BASE to its public API URL.'
+        message: 'The secure TTU service is connecting. If this is the first request, the server may be waking up. Please try again in a few seconds.'
       };
     }
 
@@ -636,8 +637,8 @@ export const DbProvider = ({ children }) => {
       if (result.success) {
         setToken(result.token);
         setCurrentUser(result.user);
+        setGoogleVerificationPending(false);
         if (result.user.role === 'admin') await refreshTestRoleManagementAccess();
-        setGoogleVerificationPending(true);
         await refreshRemoteData();
         addNotification(`User ${result.user.name} signed in with Google.`);
         return { success: true, user: result.user };
@@ -647,6 +648,37 @@ export const DbProvider = ({ children }) => {
       return { success: false, message: error.message || 'The secure TTU sign-in service is unavailable. Please try again.' };
     }
 
+  };
+
+  const passwordPortalSignIn = async (accessToken, profile = null) => {
+    let backendReady = useApi;
+    if (!backendReady) {
+      backendReady = await isApiAvailable();
+    }
+    if (!backendReady) {
+      await new Promise(res => setTimeout(res, 2000));
+      backendReady = await isApiAvailable();
+    }
+    if (!backendReady) {
+      return {
+        success: false,
+        message: 'The TTU server is waking up. Please try signing in again in a few seconds.'
+      };
+    }
+    try {
+      const result = await api.auth.passwordSignIn(accessToken, profile);
+      if (!result.success) return { success: false, message: result.error || 'Portal sign-in failed.' };
+      setUseApi(true);
+      setToken(result.token);
+      setCurrentUser(result.user);
+      setGoogleVerificationPending(false);
+      if (result.user.role === 'admin') await refreshTestRoleManagementAccess();
+      await refreshRemoteData();
+      addNotification(`User ${result.user.name} signed in securely.`);
+      return { success: true, user: result.user };
+    } catch (error) {
+      return { success: false, message: error.message || 'Portal sign-in failed.' };
+    }
   };
 
   const logout = async () => {
@@ -971,7 +1003,8 @@ export const DbProvider = ({ children }) => {
         const year = group.year || currentUser?.year || 'Year 1';
         const result = await api.timetable.saveClassGroup({
           year,
-          title: createClassGroupTitle(year),
+          course: group.course || 'General',
+          title: group.title || createClassGroupTitle(year),
           headName: group.headName || currentUser?.name || 'Class Head',
           headId: group.headId || currentUser?.id || '',
           headPhone: group.headPhone || '',
@@ -990,20 +1023,22 @@ export const DbProvider = ({ children }) => {
 
     // localStorage fallback
     const year = group.year || currentUser?.year || 'Year 1';
+    const course = group.course || 'General';
     const cleanPhone = (group.headPhone || '').replace(/[^0-9]/g, '');
     const savedGroup = {
-      id: group.id || `wg_${year.replace(/[^a-z0-9]/gi, '_').toLowerCase()}`,
+      id: group.id || `wg_${year.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_${course.replace(/[^a-z0-9]/gi, '_').toLowerCase()}`,
       year,
-      title: createClassGroupTitle(year),
+      course,
+      title: group.title || createClassGroupTitle(year),
       headName: group.headName || currentUser?.name || 'Class Head',
       headId: group.headId || currentUser?.id || '',
       headPhone: cleanPhone,
       inviteLink: (group.inviteLink || '').trim(),
       updatedAt: new Date().toISOString()
     };
-    const hasExistingYear = classGroups.some(item => item.year === year);
-    const updated = hasExistingYear
-      ? classGroups.map(item => item.year === year ? { ...item, ...savedGroup, id: item.id || savedGroup.id } : item)
+    const hasExistingGroup = classGroups.some(item => item.year === year && (item.course || 'General') === course);
+    const updated = hasExistingGroup
+      ? classGroups.map(item => item.year === year && (item.course || 'General') === course ? { ...item, ...savedGroup, id: item.id || savedGroup.id } : item)
       : [...classGroups, savedGroup];
     syncClassGroups(updated);
     addNotification(`${savedGroup.title} WhatsApp contact updated.`);
@@ -1147,9 +1182,27 @@ export const DbProvider = ({ children }) => {
   };
 
   const createRegistrationCode = async (role, expiresInHours) => {
-    if (!useApi || !canManageTestRoles) return { success: false, message: 'Registration-code generation requires the configured backend administrator.' };
+    if (!useApi || currentUser?.role !== 'admin') return { success: false, message: 'Registration-code generation requires an administrator account and the connected backend.' };
     try {
       return await api.users.createRegistrationCode(role, expiresInHours);
+    } catch (error) {
+      return { success: false, message: error.message };
+    }
+  };
+
+  const listRegistrationCodes = async () => {
+    if (!useApi || currentUser?.role !== 'admin') return { success: false, codes: [] };
+    try {
+      return await api.users.listRegistrationCodes();
+    } catch (error) {
+      return { success: false, codes: [], message: error.message };
+    }
+  };
+
+  const revokeRegistrationCode = async (id) => {
+    if (!useApi || currentUser?.role !== 'admin') return { success: false, message: 'Only administrators can revoke registration codes.' };
+    try {
+      return await api.users.revokeRegistrationCode(id);
     } catch (error) {
       return { success: false, message: error.message };
     }
@@ -1206,6 +1259,7 @@ export const DbProvider = ({ children }) => {
       googleVerificationPending,
       login,
       googleSignIn,
+      passwordPortalSignIn,
       confirmGoogleVerification,
       logout,
       addDeadline,
@@ -1231,6 +1285,8 @@ export const DbProvider = ({ children }) => {
       provisionIdentities,
       updateUserProfilePic,
       createRegistrationCode,
+      listRegistrationCodes,
+      revokeRegistrationCode,
       deleteUser,
       markAllNotificationsAsRead
     }}>

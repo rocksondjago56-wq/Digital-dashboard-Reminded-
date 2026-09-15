@@ -140,17 +140,47 @@ router.get('/role-management-access', authenticate, requireAdmin(), (req, res) =
 
 router.post('/registration-codes', authenticate, requireAdmin(), async (req, res) => {
   try {
-    if (!canManageTestRoles(req.user)) return res.status(403).json({ error: 'Registration code generation is limited to the configured test administrator.' });
     const { role, expiresInHours = 24 } = req.body;
     if (!['student', 'lecturer', 'admin'].includes(role)) return res.status(400).json({ error: 'Choose student, lecturer, or admin.' });
     const hours = Number(expiresInHours);
     if (!Number.isFinite(hours) || hours < 1 || hours > 720) return res.status(400).json({ error: 'Expiration must be between 1 and 720 hours.' });
     const code = `TTU-${crypto.randomBytes(5).toString('hex').toUpperCase()}`;
-    await prisma.registrationCode.create({ data: { codeHash: await bcrypt.hash(code, 12), role, expiresAt: new Date(Date.now() + hours * 60 * 60 * 1000), createdBy: req.user.id } });
-    res.status(201).json({ success: true, code, role, expiresAt: new Date(Date.now() + hours * 60 * 60 * 1000).toISOString() });
+    const expiresAt = new Date(Date.now() + hours * 60 * 60 * 1000);
+    const registrationCode = await prisma.registrationCode.create({ data: { codeHash: await bcrypt.hash(code, 12), role, expiresAt, createdBy: req.user.id } });
+    res.status(201).json({ success: true, code, registrationCode: { id: registrationCode.id, role, expiresAt: expiresAt.toISOString() }, role, expiresAt: expiresAt.toISOString() });
   } catch (error) {
     console.error('Registration code generation error:', error);
     res.status(500).json({ error: 'Could not generate a registration code.' });
+  }
+});
+
+router.get('/registration-codes', authenticate, requireAdmin(), async (_req, res) => {
+  try {
+    const codes = await prisma.registrationCode.findMany({
+      select: { id: true, role: true, expiresAt: true, usedAt: true, usedBy: true, revokedAt: true, revokedBy: true, createdAt: true, createdBy: true },
+      orderBy: { createdAt: 'desc' },
+      take: 100
+    });
+    res.json({ success: true, codes });
+  } catch (error) {
+    console.error('Registration code history error:', error);
+    res.status(500).json({ error: 'Could not retrieve registration code history.' });
+  }
+});
+
+router.post('/registration-codes/:id/revoke', authenticate, requireAdmin(), async (req, res) => {
+  try {
+    const code = await prisma.registrationCode.findUnique({ where: { id: req.params.id } });
+    if (!code) return res.status(404).json({ error: 'Registration code not found.' });
+    if (code.usedAt) return res.status(409).json({ error: 'A code already used cannot be revoked.' });
+    const revoked = await prisma.registrationCode.update({
+      where: { id: code.id },
+      data: { revokedAt: new Date(), revokedBy: req.user.id }
+    });
+    res.json({ success: true, code: { id: revoked.id, revokedAt: revoked.revokedAt } });
+  } catch (error) {
+    console.error('Registration code revoke error:', error);
+    res.status(500).json({ error: 'Could not revoke the registration code.' });
   }
 });
 

@@ -1,4 +1,4 @@
-import React, { useContext, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import * as XLSX from 'xlsx';
 import { DbContext } from '../context/DbContextDefinition';
 import './AdminDashboard.css';
@@ -35,6 +35,8 @@ export default function AdminDashboard() {
     updateUserRole,
     canManageTestRoles,
     createRegistrationCode,
+    listRegistrationCodes,
+    revokeRegistrationCode,
     provisionIdentity,
     provisionIdentities,
     deleteUser
@@ -45,6 +47,7 @@ export default function AdminDashboard() {
   const [registrationHours, setRegistrationHours] = useState('24');
   const [generatedRegistrationCode, setGeneratedRegistrationCode] = useState('');
   const [registrationCodeError, setRegistrationCodeError] = useState('');
+  const [registrationCodes, setRegistrationCodes] = useState([]);
 
   const handleRegistrationCode = async (event) => {
     event.preventDefault();
@@ -53,6 +56,22 @@ export default function AdminDashboard() {
     const result = await createRegistrationCode(registrationRole, registrationHours);
     if (!result?.success) return setRegistrationCodeError(result?.message || 'Could not generate a registration code.');
     setGeneratedRegistrationCode(`${result.code} - expires ${new Date(result.expiresAt).toLocaleString()}`);
+    const refreshed = await listRegistrationCodes();
+    if (refreshed.success) setRegistrationCodes(refreshed.codes);
+  };
+
+  useEffect(() => {
+    listRegistrationCodes().then(result => {
+      if (result.success) setRegistrationCodes(result.codes);
+    });
+    // This history only needs loading once when the administration dashboard opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleRevokeRegistrationCode = async (id) => {
+    const result = await revokeRegistrationCode(id);
+    if (!result?.success) return setRegistrationCodeError(result?.message || 'Could not revoke the registration code.');
+    setRegistrationCodes(codes => codes.map(code => code.id === id ? { ...code, revokedAt: result.code.revokedAt } : code));
   };
 
   // Form toggles
@@ -89,6 +108,8 @@ export default function AdminDashboard() {
   const [ttYear, setTtYear] = useState('All Years');
 
   const [wgYear, setWgYear] = useState('Year 1');
+  const [wgCourse, setWgCourse] = useState('General');
+  const [wgTitle, setWgTitle] = useState('');
   const [wgHeadName, setWgHeadName] = useState('');
   const [wgHeadPhone, setWgHeadPhone] = useState('');
   const [wgInviteLink, setWgInviteLink] = useState('');
@@ -327,6 +348,8 @@ export default function AdminDashboard() {
 
   const resetWhatsAppGroupForm = () => {
     setWgYear('Year 1');
+    setWgCourse('General');
+    setWgTitle('');
     setWgHeadName('');
     setWgHeadPhone('');
     setWgInviteLink('');
@@ -334,23 +357,27 @@ export default function AdminDashboard() {
     setShowForm(false);
   };
 
-  const handleWhatsAppGroupSubmit = (e) => {
+  const handleWhatsAppGroupSubmit = async (e) => {
     e.preventDefault();
     if (!wgInviteLink.trim() || !saveClassWhatsAppGroup) return;
 
-    const savedGroup = saveClassWhatsAppGroup({
+    const savedGroup = await saveClassWhatsAppGroup({
       year: wgYear,
+      course: wgCourse,
+      title: wgTitle.trim(),
       headName: wgHeadName.trim() || 'Class Head',
       headPhone: wgHeadPhone,
       inviteLink: wgInviteLink
     });
 
-    setWgStatus(`${savedGroup.title} saved`);
+    setWgStatus(savedGroup ? `${savedGroup.title} saved` : 'Could not save the class group.');
     setTimeout(() => setWgStatus(''), 2500);
   };
 
   const startWhatsAppGroupEdit = (group) => {
     setWgYear(group.year || 'Year 1');
+    setWgCourse(group.course || 'General');
+    setWgTitle(group.title || '');
     setWgHeadName(group.headName || '');
     setWgHeadPhone(group.headPhone || '');
     setWgInviteLink(group.inviteLink || '');
@@ -890,10 +917,6 @@ export default function AdminDashboard() {
 
             {showForm && (
               <form onSubmit={handleWhatsAppGroupSubmit} className="admin-action-form animate-fade-in">
-                <div className="admin-generated-title">
-                  <span>Auto class title</span>
-                  <strong>{createClassGroupTitle(wgYear)}</strong>
-                </div>
                 <div className="admin-whatsapp-actions">
                   <button type="button" className="btn btn-secondary btn-sm" onClick={copyAdminGroupTitle}>
                     Copy Title
@@ -903,6 +926,14 @@ export default function AdminDashboard() {
                   </button>
                 </div>
                 <div className="form-row-3">
+                  <div className="form-group">
+                    <label>Group Name</label>
+                    <input type="text" value={wgTitle} onChange={(e) => setWgTitle(e.target.value)} placeholder={`${wgCourse} ${wgYear} Class Group`} />
+                  </div>
+                  <div className="form-group">
+                    <label>Course</label>
+                    <input type="text" value={wgCourse} onChange={(e) => setWgCourse(e.target.value)} placeholder="Typography" required />
+                  </div>
                   <div className="form-group">
                     <label>Class / Year</label>
                     <select value={wgYear} onChange={(e) => setWgYear(e.target.value)}>
@@ -957,7 +988,7 @@ export default function AdminDashboard() {
                       <h4>{group.title}</h4>
                       <p>Class Head: {group.headName || 'Class Head'}</p>
                       <span className="row-meta">
-                        Year: {group.year} | {group.inviteLink ? 'Class group link added' : 'No class group link available yet.'}
+                        Course: {group.course || 'General'} | Year: {group.year} | {group.inviteLink ? 'Class group link added' : 'No class group link available yet.'}
                       </span>
                     </div>
                     <div className="admin-row-actions">
@@ -981,13 +1012,26 @@ export default function AdminDashboard() {
             <div className="tab-actions-row">
               <h3>Member Registration & Role Permissions</h3>
             </div>
-            {canManageTestRoles && <form className="admin-action-form" onSubmit={handleRegistrationCode}>
+            <p className="admin-form-status">Demo Mode Enabled. Remove before production deployment.</p>
+            <form className="admin-action-form" onSubmit={handleRegistrationCode}>
               <h4>Generate Registration Code</h4>
               <div className="form-grid"><div className="form-group"><label>Role</label><select value={registrationRole} onChange={event => setRegistrationRole(event.target.value)}><option value="student">Student</option><option value="lecturer">Lecturer</option><option value="admin">Administrator</option></select></div><div className="form-group"><label>Expires In (Hours)</label><input type="number" min="1" max="720" value={registrationHours} onChange={event => setRegistrationHours(event.target.value)} /></div></div>
               <button className="btn btn-primary" type="submit">Generate Code</button>
               {generatedRegistrationCode && <p className="admin-form-status">{generatedRegistrationCode}</p>}
               {registrationCodeError && <p className="admin-form-error">{registrationCodeError}</p>}
-            </form>}
+            </form>
+            <div className="admin-data-list mt-2">
+              <h4>Registration Code History</h4>
+              {registrationCodes.length === 0 ? <p>No registration codes have been generated yet.</p> : registrationCodes.map(code => (
+                <div className="admin-data-row" key={code.id}>
+                  <div className="admin-row-info">
+                    <h4>{code.role}</h4>
+                    <span className="row-meta">Expires: {new Date(code.expiresAt).toLocaleString()} | {code.usedAt ? 'Used' : code.revokedAt ? 'Revoked' : 'Active'}</span>
+                  </div>
+                  {!code.usedAt && !code.revokedAt && <button type="button" className="btn-icon-danger" onClick={() => handleRevokeRegistrationCode(code.id)}>Revoke</button>}
+                </div>
+              ))}
+            </div>
             
             <div className="users-table-container mt-2">
               <table className="admin-users-table">

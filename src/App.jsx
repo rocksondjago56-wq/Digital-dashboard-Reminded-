@@ -1,4 +1,4 @@
-import React, { useContext } from 'react';
+import React, { useContext, useEffect } from 'react';
 import { DbContext } from './context/DbContextDefinition';
 import Login from './components/Login';
 import Navbar from './components/Navbar';
@@ -7,8 +7,27 @@ import LecturerDashboard from './components/LecturerDashboard';
 import AdminDashboard from './components/AdminDashboard';
 import WhatsAppWidget from './components/WhatsAppWidget';
 
+const DASHBOARD_BY_ROLE = {
+  student: 'Student Dashboard',
+  student_head: 'Student Dashboard',
+  lecturer: 'Lecturer Dashboard',
+  admin: 'Administration Dashboard'
+};
+
 export default function App() {
   const ctx = useContext(DbContext);
+
+  useEffect(() => {
+    const user = ctx?.currentUser;
+    if (import.meta.env.DEV && user) {
+      console.info('[TTU Auth] Dashboard decision', {
+        userId: user.id,
+        email: user.email,
+        role: user.role,
+        selectedDashboard: DASHBOARD_BY_ROLE[user.role] || 'Access denied'
+      });
+    }
+  }, [ctx?.currentUser]);
 
   // Guard against context being undefined (e.g. during HMR reload)
   if (!ctx) {
@@ -66,6 +85,18 @@ export default function App() {
         <Login />
         <WhatsAppWidget />
       </>
+    );
+  }
+
+  if (!DASHBOARD_BY_ROLE[currentUser.role]) {
+    return (
+      <main className="login-container">
+        <section className="login-card glass-panel">
+          <h1>Access denied</h1>
+          <p className="subtitle">Profile not found, contact administrator.</p>
+          <button className="btn btn-primary" type="button" onClick={ctx.logout}>Sign out</button>
+        </section>
+      </main>
     );
   }
 

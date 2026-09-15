@@ -30,15 +30,18 @@ export default function WhatsAppWidget() {
   const [copied, setCopied] = useState(false);
   const [copiedClassGroupId, setCopiedClassGroupId] = useState(null);
   const [classYear, setClassYear] = useState(currentUser?.year || 'Year 1');
+  const [classCourse, setClassCourse] = useState('General');
+  const [classGroupName, setClassGroupName] = useState('');
   const [classHeadPhone, setClassHeadPhone] = useState('');
   const [classInviteLink, setClassInviteLink] = useState('');
   const [classGroupStatus, setClassGroupStatus] = useState('');
 
   const generatedClassTitle = createClassGroupTitle(classYear);
   const isClassHead = currentUser?.role === 'student_head';
+  const canManageClassGroups = ['admin', 'lecturer'].includes(currentUser?.role);
   const visibleClassGroups = (classGroups || []).filter(group => {
     if (!currentUser) return false;
-    if (currentUser.role === 'admin' || currentUser.role === 'student_head') return true;
+    if (canManageClassGroups) return true;
     return group.year === currentUser.year;
   });
 
@@ -47,17 +50,18 @@ export default function WhatsAppWidget() {
   }, []);
 
   useEffect(() => {
-    if (isClassHead && currentUser?.year) {
+    if ((isClassHead || canManageClassGroups) && currentUser?.year) {
       setClassYear(currentUser.year);
     }
-  }, [currentUser?.id, currentUser?.year, isClassHead]);
+  }, [currentUser?.id, currentUser?.year, isClassHead, canManageClassGroups]);
 
   useEffect(() => {
-    if (!isClassHead) return;
-    const savedGroup = classGroups.find(group => group.year === classYear);
+    if (!isClassHead && !canManageClassGroups) return;
+    const savedGroup = classGroups.find(group => group.year === classYear && (group.course || 'General') === classCourse);
     setClassHeadPhone(savedGroup?.headPhone || '');
     setClassInviteLink(savedGroup?.inviteLink || '');
-  }, [classGroups, classYear, isClassHead]);
+    setClassGroupName(savedGroup?.title || '');
+  }, [classGroups, classYear, classCourse, isClassHead, canManageClassGroups]);
 
   const handleOpenDirectChat = (customText = '') => {
     const defaultText = customText || (currentUser
@@ -78,19 +82,21 @@ export default function WhatsAppWidget() {
     if (group.inviteLink) window.open(group.inviteLink, '_blank', 'noopener,noreferrer');
   };
 
-  const handleSaveClassGroup = (e) => {
+  const handleSaveClassGroup = async (e) => {
     e.preventDefault();
     if (!saveClassWhatsAppGroup || !classInviteLink.trim()) return;
 
-    const savedGroup = saveClassWhatsAppGroup({
+    const savedGroup = await saveClassWhatsAppGroup({
       year: classYear,
-      headName: currentUser?.name || 'Class Head',
+      course: classCourse,
+      title: classGroupName.trim(),
+      headName: currentUser?.name || 'Class Group Manager',
       headId: currentUser?.id || '',
       headPhone: classHeadPhone,
       inviteLink: classInviteLink
     });
 
-    setClassGroupStatus(`${savedGroup.title} saved`);
+    setClassGroupStatus(savedGroup ? `${savedGroup.title} saved` : 'Could not save the class group.');
     setTimeout(() => setClassGroupStatus(''), 2500);
   };
 
@@ -291,7 +297,7 @@ export default function WhatsAppWidget() {
                       View your class group and join using the link shared by your administrator.
                     </p>
 
-                    {isClassHead && (
+                    {canManageClassGroups && (
                       <form className="whatsapp-class-head-form" onSubmit={handleSaveClassGroup}>
                         <div className="whatsapp-generated-title">
                           <span>Auto class title</span>
@@ -307,6 +313,14 @@ export default function WhatsAppWidget() {
                           </button>
                         </div>
 
+                        <div className="whatsapp-input-group">
+                          <label htmlFor="classGroupName">Group Name</label>
+                          <input id="classGroupName" value={classGroupName} onChange={(e) => setClassGroupName(e.target.value)} placeholder={`${classCourse} ${classYear} Class Group`} />
+                        </div>
+                        <div className="whatsapp-input-group">
+                          <label htmlFor="classCourse">Course</label>
+                          <input id="classCourse" value={classCourse} onChange={(e) => setClassCourse(e.target.value)} placeholder="Typography" required />
+                        </div>
                         <div className="whatsapp-input-group">
                           <label htmlFor="classYear">Class / Year</label>
                           <select
@@ -358,7 +372,7 @@ export default function WhatsAppWidget() {
                             <span className="whatsapp-group-icon">WA</span>
                             <div>
                               <strong>{group.title}</strong>
-                              <p>{group.year} class updates, announcements, and course discussion.</p>
+                              <p>{group.course || 'General'} | {group.year} class updates and course discussion.</p>
                               <p>{group.inviteLink ? 'Class group link available.' : 'No class group link available yet.'}</p>
                             </div>
                           </div>
@@ -377,7 +391,7 @@ export default function WhatsAppWidget() {
                             >
                               {copiedClassGroupId === group.id ? 'Copied' : 'Copy'}
                             </button>
-                            {(currentUser?.role === 'admin' || (isClassHead && group.headId === currentUser?.id)) && deleteClassWhatsAppGroup && (
+                            {canManageClassGroups && deleteClassWhatsAppGroup && (
                               <button
                                 className="btn btn-whatsapp-danger btn-sm"
                                 onClick={() => deleteClassWhatsAppGroup(group.id)}

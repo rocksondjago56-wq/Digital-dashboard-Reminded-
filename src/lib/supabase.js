@@ -21,6 +21,7 @@ const toProfileMetadata = (profile) => ({
   name: profile.fullName,
   registration_email: profile.email,
   phone: profile.phone,
+  program: profile.program,
   year: profile.year,
   certificate: profile.certificate,
   student_id: profile.indexNumber,
@@ -56,6 +57,25 @@ export async function signInWithGoogle(profile = null) {
     }
   });
   if (error) throw error;
+}
+
+export async function signUpWithEmailPassword(profile, password) {
+  if (!supabase) throw new Error('Supabase authentication is not configured.');
+  const { accessCode: _accessCode, ...safeProfile } = profile;
+  const { data, error } = await supabase.auth.signUp({
+    email: profile.email.trim(),
+    password,
+    options: { data: toProfileMetadata(safeProfile) }
+  });
+  if (error) throw error;
+  return data;
+}
+
+export async function signInWithEmailPassword(email, password) {
+  if (!supabase) throw new Error('Supabase authentication is not configured.');
+  const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+  if (error) throw error;
+  return data;
 }
 
 export async function getSupabaseSession() {

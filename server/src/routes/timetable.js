@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
-import { authenticate, requireAdmin } from '../middleware/auth.js';
+import { authenticate, requireAdmin, requireStaff } from '../middleware/auth.js';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -118,6 +118,7 @@ router.get('/class-groups', authenticate, async (req, res) => {
     const formatted = groups.map(g => ({
       id: g.id,
       year: g.year,
+      course: g.course,
       title: g.title,
       headName: g.headName,
       headId: g.headId,
@@ -137,18 +138,19 @@ router.get('/class-groups', authenticate, async (req, res) => {
  * POST /api/timetable/class-groups
  * Create or update a WhatsApp class group.
  */
-router.post('/class-groups', authenticate, async (req, res) => {
+router.post('/class-groups', authenticate, requireStaff(), async (req, res) => {
   try {
-    const { year, title, headName, headId, headPhone, inviteLink } = req.body;
+    const { year, course, title, headName, headId, headPhone, inviteLink } = req.body;
 
     if (!year) {
       return res.status(400).json({ error: 'Year is required.' });
     }
 
+    const cleanCourse = (course || 'General').trim() || 'General';
     const group = await prisma.classWhatsAppGroup.upsert({
-      where: { year },
+      where: { year_course: { year, course: cleanCourse } },
       update: {
-        title: title || `Year ${year} Class Group`,
+        title: title?.trim() || `${cleanCourse} ${year} Class Group`,
         headName: headName || req.user.name,
         headId: headId || req.user.id,
         headPhone: (headPhone || '').replace(/[^0-9]/g, ''),
@@ -156,7 +158,8 @@ router.post('/class-groups', authenticate, async (req, res) => {
       },
       create: {
         year,
-        title: title || `Year ${year} Class Group`,
+        course: cleanCourse,
+        title: title?.trim() || `${cleanCourse} ${year} Class Group`,
         headName: headName || req.user.name,
         headId: headId || req.user.id,
         headPhone: (headPhone || '').replace(/[^0-9]/g, ''),
@@ -169,6 +172,7 @@ router.post('/class-groups', authenticate, async (req, res) => {
       group: {
         id: group.id,
         year: group.year,
+        course: group.course,
         title: group.title,
         headName: group.headName,
         headId: group.headId,
@@ -187,7 +191,7 @@ router.post('/class-groups', authenticate, async (req, res) => {
  * DELETE /api/timetable/class-groups/:id
  * Delete a WhatsApp class group.
  */
-router.delete('/class-groups/:id', authenticate, async (req, res) => {
+router.delete('/class-groups/:id', authenticate, requireStaff(), async (req, res) => {
   try {
     const { id } = req.params;
     const group = await prisma.classWhatsAppGroup.findUnique({ where: { id } });

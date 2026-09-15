@@ -4,26 +4,10 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { authenticate } from '../middleware/auth.js';
-import { getSupabaseProfile, getVerifiedSupabaseUser, updateSupabaseProfileRole } from '../services/supabase-auth.js';
+import { ensureSupabaseProfile, getVerifiedSupabaseUser, updateSupabaseProfileRole } from '../services/supabase-auth.js';
 
 const router = Router();
 const prisma = new PrismaClient();
-
-async function consumeRegistrationCode(code, role, userId) {
-  if (!code || !role) return false;
-  const candidates = await prisma.registrationCode.findMany({ where: { role, usedAt: null, expiresAt: { gt: new Date() } } });
-  const match = await Promise.all(candidates.map(async candidate => (await bcrypt.compare(code, candidate.codeHash)) ? candidate : null));
-  const registrationCode = match.find(Boolean);
-  if (!registrationCode) return false;
-  await prisma.registrationCode.update({ where: { id: registrationCode.id }, data: { usedAt: new Date(), usedBy: userId } });
-  return true;
-}
-
-function isDemoRegistrationCode(code, role) {
-  return process.env.DEMO_MODE === 'true'
-    && ['lecturer', 'admin'].includes(role)
-    && code === '0000';
-}
 
 /**
  * Generate a JWT token for a user.
@@ -60,6 +44,77 @@ function formatUser(user, completedDeadlines = []) {
   };
 }
 
+async function exchangePasswordAccount(accessToken, profile = {}) {
+  const authUser = await getVerifiedSupabaseUser(accessToken);
+  if (!authUser.email) throw new Error('A verified Supabase email/password session is required.');
+  const email = authUser.email.trim().toLowerCase();
+  if (profile.email?.trim() && profile.email.trim().toLowerCase() !== email) {
+    throw new Error('Use the same email address used during registration.');
+  }
+
+  let supabaseProfile = await ensureSupabaseProfile(accessToken, authUser);
+  const metadata = authUser.user_metadata || {};
+  const requestedRole = ['student', 'lecturer', 'admin'].includes(profile.role)
+    ? profile.role
+    : (['student', 'lecturer', 'admin'].includes(metadata.requested_role) ? metadata.requested_role : null);
+
+  // Activate requested role if the profile does not have a role assigned yet
+  if (!supabaseProfile.role && requestedRole) {
+    if (requestedRole === 'admin') {
+      throw new Error('Administrator accounts must be provisioned by an existing administrator.');
+    }
+    supabaseProfile = await updateSupabaseProfileRole(supabaseProfile.id, requestedRole);
+    supabaseProfile.role = requestedRole;
+  }
+
+  const role = supabaseProfile.role || (requestedRole && requestedRole !== 'admin' ? requestedRole : 'student');
+  if (role === 'admin' && supabaseProfile.role !== 'admin') {
+    throw new Error('Administrator accounts must be provisioned by an existing administrator.');
+  }
+
+  const name = profile.fullName?.trim() || metadata.name || metadata.full_name || email.split('@')[0];
+  const courses = Array.isArray(profile.courses) ? profile.courses.filter(Boolean) : (metadata.requested_courses || []);
+  const registrationFields = {
+    department: profile.department?.trim() || metadata.department || 'Graphic Design',
+    year: role === 'student' ? profile.year || metadata.year || 'Year 1' : null,
+    certificate: role === 'student' ? profile.certificate || metadata.certificate || 'BTech' : null,
+    studentId: role === 'student' ? profile.indexNumber?.trim() || metadata.student_id || null : null,
+    staffId: role === 'student' ? null : (profile.lecturerId || profile.staffId || metadata.staff_id || null),
+    phone: profile.phone?.trim() || metadata.phone || null,
+    designation: role === 'admin' ? profile.position?.trim() || metadata.designation || 'Department Administrator' : null,
+    courses: role === 'lecturer' ? courses : []
+  };
+
+  const user = await prisma.user.upsert({
+    where: { email },
+    update: { name, role, isVerified: true, ...registrationFields },
+    create: {
+      name,
+      email,
+      passwordHash: await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 12),
+      role,
+      isVerified: true,
+      ...registrationFields,
+      studentId: role === 'student' ? registrationFields.studentId || null : null
+    }
+  });
+  const completedDeadlines = (role === 'student' || role === 'student_head')
+    ? (await prisma.deadlineCompletion.findMany({ where: { studentId: user.id }, select: { deadlineId: true } }).catch(() => [])).map(item => item.deadlineId)
+    : [];
+  console.info('[auth] Email/password role decision', { userId: user.id, email, role, dashboard: `${role}-dashboard` });
+  return { token: generateToken(user), user: formatUser(user, completedDeadlines) };
+}
+
+router.post('/password-signin', async (req, res) => {
+  try {
+    const result = await exchangePasswordAccount(req.body.accessToken, req.body.profile || {});
+    res.json({ success: true, ...result });
+  } catch (error) {
+    console.error('Email/password portal sign-in error:', error);
+    res.status(400).json({ error: error.message || 'Could not sign in to the portal.' });
+  }
+});
+
 /**
  * POST /api/auth/google-signin
  * Exchange a verified Supabase Google session for a TTU portal session.
@@ -77,52 +132,39 @@ router.post('/google-signin', async (req, res) => {
     if (profile.email?.trim() && profile.email.trim().toLowerCase() !== email) {
       return res.status(400).json({ error: 'Use the same Google email address entered during registration.' });
     }
-    let supabaseProfile = await getSupabaseProfile(accessToken, email);
-    if (!supabaseProfile) return res.status(404).json({ error: 'Profile not found, contact administrator.' });
+    let supabaseProfile = await ensureSupabaseProfile(accessToken, googleUser);
     const metadata = googleUser.user_metadata || {};
     const name = profile.fullName?.trim() || metadata.full_name || metadata.name || email.split('@')[0];
     const profilePictureUrl = metadata.avatar_url || metadata.picture || null;
-    const identityNumber = profile.identityNumber?.trim();
-    const userByIdentity = identityNumber
-      ? await prisma.user.findUnique({ where: { staffId: identityNumber } })
-      : null;
-    if (identityNumber && (!userByIdentity || userByIdentity.email !== email)) {
-      return res.status(403).json({ error: 'That Lecturer ID or Staff ID is not linked to this Google email.' });
-    }
-    const requestedRole = ['student', 'lecturer', 'admin'].includes(profile.role) ? profile.role : null;
+
+    const requestedRole = ['student', 'lecturer', 'admin'].includes(profile.role)
+      ? profile.role
+      : (['student', 'lecturer', 'admin'].includes(metadata.requested_role) ? metadata.requested_role : null);
+
     if (!supabaseProfile.role && requestedRole) {
-      const canActivateRole = requestedRole === 'student'
-        || isDemoRegistrationCode(profile.accessCode, requestedRole)
-        || await consumeRegistrationCode(profile.accessCode, requestedRole, supabaseProfile.id);
-      if (!canActivateRole) {
-        return res.status(403).json({ error: 'A valid registration code is required for lecturer or administration accounts.' });
+      if (requestedRole === 'admin') {
+        return res.status(403).json({ error: 'Administrator accounts must be provisioned by an existing administrator.' });
       }
       supabaseProfile = await updateSupabaseProfileRole(supabaseProfile.id, requestedRole);
+      supabaseProfile.role = requestedRole;
     }
-    if (!supabaseProfile.role || !['student', 'lecturer', 'admin'].includes(supabaseProfile.role)) {
-      return res.status(404).json({ error: 'Profile not found, contact administrator.' });
-    }
-    const isApprovedProfile = !requestedRole || requestedRole === supabaseProfile.role;
-    if (!isApprovedProfile) {
-      return res.status(403).json({
-        error: 'The registration role does not match the activated Supabase profile.'
-      });
-    }
-    const role = supabaseProfile.role;
-    const courses = Array.isArray(profile.courses) ? profile.courses.filter(Boolean) : [];
 
-    // Privileged roles come from a department-provisioned record, never from
-    // an unauthenticated registration form.
-    const registrationFields = isApprovedProfile && requestedRole ? {
-      department: profile.department?.trim() || 'Graphic Design',
-      year: requestedRole === 'student' ? profile.year || 'Year 1' : null,
-      certificate: requestedRole === 'student' ? profile.certificate || 'BTech' : null,
-      studentId: requestedRole === 'student' ? profile.indexNumber?.trim() || null : null,
-      staffId: requestedRole === 'student' ? null : (profile.lecturerId || profile.staffId || null),
-      phone: profile.phone?.trim() || null,
-      designation: requestedRole === 'admin' ? profile.position?.trim() || null : null,
-      courses: requestedRole === 'lecturer' ? courses : []
-    } : {};
+    const role = supabaseProfile.role || (requestedRole && requestedRole !== 'admin' ? requestedRole : 'student');
+    if (role === 'admin' && supabaseProfile.role !== 'admin') {
+      return res.status(403).json({ error: 'Administrator accounts must be provisioned by an existing administrator.' });
+    }
+
+    const courses = Array.isArray(profile.courses) ? profile.courses.filter(Boolean) : (metadata.requested_courses || []);
+    const registrationFields = {
+      department: profile.department?.trim() || metadata.department || 'Graphic Design',
+      year: role === 'student' ? profile.year || metadata.year || 'Year 1' : null,
+      certificate: role === 'student' ? profile.certificate || metadata.certificate || 'BTech' : null,
+      studentId: role === 'student' ? profile.indexNumber?.trim() || metadata.student_id || null : null,
+      staffId: role === 'student' ? null : (profile.lecturerId || profile.staffId || metadata.staff_id || null),
+      phone: profile.phone?.trim() || metadata.phone || null,
+      designation: role === 'admin' ? profile.position?.trim() || metadata.designation || 'Department Administrator' : null,
+      courses: role === 'lecturer' ? courses : []
+    };
 
     const user = await prisma.user.upsert({
       where: { email },
@@ -145,22 +187,22 @@ router.post('/google-signin', async (req, res) => {
       }
     });
 
-    const completedDeadlines = user.role === 'student' || user.role === 'student_head'
-      ? (await prisma.deadlineCompletion.findMany({ where: { studentId: user.id }, select: { deadlineId: true } })).map(item => item.deadlineId)
+    const completedDeadlines = (user.role === 'student' || user.role === 'student_head')
+      ? (await prisma.deadlineCompletion.findMany({ where: { studentId: user.id }, select: { deadlineId: true } }).catch(() => [])).map(item => item.deadlineId)
       : [];
 
-    console.info('[auth] Google sign-in role decision', { email, profileId: supabaseProfile.id, role: user.role });
+    console.info('[auth] Google sign-in role decision', { userId: user.id, email, profileId: supabaseProfile.id, role: user.role, dashboard: `${user.role}-dashboard` });
     res.json({ success: true, token: generateToken(user), user: formatUser(user, completedDeadlines) });
   } catch (error) {
     console.error('Google sign-in error:', error);
-    res.status(500).json({ error: 'Google sign-in could not create your portal profile. Please try again.' });
+    res.status(500).json({ error: error.message || 'Google sign-in could not create your portal profile. Please try again.' });
   }
 });
 
 /**
  * POST /api/auth/login
- * Authenticate with email, name, studentId, staffId, or mobile phone + password.
- * Blocks unverified users until verification is completed.
+ * Legacy local-password endpoint for existing records. New portal sign-in uses
+ * Supabase email/password sessions through /password-signin.
  */
 router.post('/login', async (req, res) => {
   try {
@@ -195,13 +237,6 @@ router.post('/login', async (req, res) => {
     const isValid = await bcrypt.compare(password, user.passwordHash);
     if (!isValid) {
       return res.status(401).json({ error: 'Incorrect password.' });
-    }
-
-    // Legacy password accounts must use their matching Google identity.
-    if (!user.isVerified) {
-      return res.status(403).json({
-        error: 'This account now uses Google sign-in. Select Continue with Google to access the portal.'
-      });
     }
 
     // Get completed deadlines for students

@@ -6,12 +6,15 @@
  * is always verified before any dashboard is opened.
  */
 
-const configuredApiBase = import.meta.env.VITE_API_BASE?.trim().replace(/\/$/, '');
+const DEFAULT_RENDER_BACKEND = 'https://digital-dashboard-reminded-8i9o.onrender.com';
+const configuredApiBase = import.meta.env.VITE_API_BASE?.trim().replace(/\/$/, '') || DEFAULT_RENDER_BACKEND;
+
 // Vercel may be configured with the Render origin or the full /api URL. The
 // Express backend mounts every portal endpoint beneath /api, so support both.
 const API_BASE = configuredApiBase
   ? (configuredApiBase.endsWith('/api') ? configuredApiBase : `${configuredApiBase}/api`)
-  : '';
+  : `${DEFAULT_RENDER_BACKEND}/api`;
+const SERVER_ROOT = configuredApiBase.replace(/\/api$/, '');
 const TOKEN_KEY = 'ttu_api_token';
 
 export const isApiConfigured = Boolean(API_BASE);
@@ -53,11 +56,18 @@ export async function isApiAvailable() {
   if (!isApiConfigured) return false;
 
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 20000);
     const response = await fetch(`${API_BASE}/health`, {
       method: 'GET',
-      signal: AbortSignal.timeout(15000)
+      signal: controller.signal
+    }).catch(async () => {
+      return fetch(`${SERVER_ROOT}/health`, { method: 'GET', signal: controller.signal });
     });
-    const health = response.ok ? await response.json() : null;
+    clearTimeout(timeoutId);
+
+    if (!response || !response.ok) return false;
+    const health = await response.json().catch(() => null);
     const available = health?.status === 'ok';
     if (import.meta.env.DEV) console.info('[TTU API] Health check:', { apiBase: API_BASE, available, health });
     return available;
@@ -115,6 +125,7 @@ export const api = {
       }),
 
     me: () => request('/auth/me'),
+    passwordSignIn: (accessToken, profile) => request('/auth/password-signin', { method: 'POST', body: JSON.stringify({ accessToken, profile }) }),
     googleSignIn: (accessToken, profile) => request('/auth/google-signin', { method: 'POST', body: JSON.stringify({ accessToken, profile }) })
   },
 
@@ -200,8 +211,6 @@ export const api = {
     listRegistrationCodes: () => request('/users/registration-codes'),
 
     revokeRegistrationCode: (id) => request(`/users/registration-codes/${id}/revoke`, { method: 'POST' }),
-
-    approveAdministrator: (id) => request(`/users/${id}/approve-administrator`, { method: 'POST' }),
 
     updateRole: (id, role) =>
       request(`/users/${id}/role`, {

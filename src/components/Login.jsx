@@ -2,70 +2,89 @@ import React, { useContext, useEffect, useRef, useState } from 'react';
 import { DbContext } from '../context/DbContextDefinition';
 import './Login.css';
 import ttuLogo from '../ttu-logo.png.png';
-import { getSupabaseSession, saveSupabaseProfile, signInWithGoogle } from '../lib/supabase';
+import { getSupabaseSession, saveSupabaseProfile, signInWithEmailPassword, signInWithGoogle, signUpWithEmailPassword } from '../lib/supabase';
 
-const COURSE_OPTIONS = ['Layout Design II', 'Vector Graphics I', 'Typography', 'Photography', 'Brand Identity', 'Motion Graphics'];
+const EMPTY_PROFILE = { role: 'student', fullName: '', indexNumber: '', email: '', password: '', program: '', certificate: 'BTech', year: 'Year 1', lecturerId: '', phone: '', department: 'Graphic Design', courses: [] };
 
 export default function Login() {
-  const { googleSignIn, googleVerificationPending, confirmGoogleVerification } = useContext(DbContext);
+  const { googleSignIn, googleVerificationPending, confirmGoogleVerification, passwordPortalSignIn } = useContext(DbContext);
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [profile, setProfile] = useState(EMPTY_PROFILE);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const [isRegistering, setIsRegistering] = useState(false);
-  const [profile, setProfile] = useState({ role: 'student', fullName: '', indexNumber: '', email: '', program: '', certificate: 'BTech', year: 'Year 1', lecturerId: '', staffId: '', phone: '', department: 'Graphic Design', position: '', courses: [], accessCode: '' });
-  const [identityNumber, setIdentityNumber] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const handledSession = useRef(false);
+  const handledGoogleSession = useRef(false);
 
-  useEffect(() => {
-    const sessionNotice = sessionStorage.getItem('ttu_session_notice');
-    if (sessionNotice) {
-      setNotice(sessionNotice);
-      sessionStorage.removeItem('ttu_session_notice');
-    }
-    const errorCode = new URLSearchParams(window.location.search).get('error');
-    if (!errorCode) return;
-    setError('Google sign-in could not be completed. Check the Google provider settings in Supabase and try again.');
-    window.history.replaceState({}, document.title, window.location.pathname);
-  }, []);
+  const updateProfile = (field, value) => setProfile(current => ({ ...current, [field]: value }));
 
   useEffect(() => {
     const restoreGoogleSession = async () => {
       const session = await getSupabaseSession();
-      if (!session?.access_token || handledSession.current || googleVerificationPending) return;
-      handledSession.current = true;
+      const isGoogleSession = session?.user?.app_metadata?.providers?.includes('google');
+      if (!session?.access_token || !isGoogleSession || handledGoogleSession.current || googleVerificationPending) return;
+      handledGoogleSession.current = true;
       setIsSubmitting(true);
-      // Registration details apply only to the OAuth round trip that began on
-      // this device. Reusing stored Google metadata would make later sign-ins
-      // incorrectly look like a new lecturer/admin registration.
       const savedProfile = JSON.parse(sessionStorage.getItem('ttu_registration_profile') || 'null');
       if (savedProfile?.role) {
-        const { accessCode: _accessCode, ...profileMetadata } = savedProfile;
-        await saveSupabaseProfile(profileMetadata);
+        const { accessCode: _accessCode, password: _password, ...metadata } = savedProfile;
+        await saveSupabaseProfile(metadata);
       }
       const result = await googleSignIn(session.access_token, session.user, savedProfile);
       sessionStorage.removeItem('ttu_registration_profile');
       if (!result.success) {
         setError(result.message || 'Your Google account could not be linked to the TTU portal.');
-        handledSession.current = false;
+        handledGoogleSession.current = false;
       }
       setIsSubmitting(false);
     };
-    restoreGoogleSession().catch(() => setError('Could not restore your secure Google session. Please try again.'));
+    restoreGoogleSession().catch(() => setError('Could not restore your Google session. Please try again.'));
   }, [googleSignIn, googleVerificationPending]);
+
+  const handlePasswordSubmit = async (event) => {
+    event.preventDefault();
+    setError('');
+    setNotice('');
+    setIsSubmitting(true);
+    try {
+      if (isRegistering) {
+        const required = profile.role === 'student'
+          ? [profile.fullName, profile.indexNumber, profile.email, profile.password, profile.program]
+          : [profile.fullName, profile.email, profile.password, profile.phone, profile.department];
+        if (required.some(value => !String(value).trim())) throw new Error('Complete all required registration fields.');
+        const result = await signUpWithEmailPassword(profile, profile.password);
+        if (!result.session?.access_token) {
+          throw new Error('Supabase email confirmation is enabled. Disable Confirm email in Supabase Authentication > Providers > Email to allow immediate portal access.');
+        }
+        const { password: _password, ...portalProfile } = profile;
+        const portal = await passwordPortalSignIn(result.session.access_token, portalProfile);
+        if (!portal.success) throw new Error(portal.message);
+      } else {
+        const result = await signInWithEmailPassword(email, password);
+        if (!result.session?.access_token) {
+          throw new Error('Could not establish an authenticated session. Please check your credentials.');
+        }
+        const portal = await passwordPortalSignIn(result.session.access_token);
+        if (!portal.success) throw new Error(portal.message);
+      }
+    } catch (submitError) {
+      const msg = submitError.message || 'Could not complete sign-in.';
+      if (msg.toLowerCase().includes('invalid login credentials')) {
+        setError('Incorrect email or password. Please verify your credentials and try again.');
+      } else {
+        setError(msg);
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const handleGoogleSignIn = async () => {
     setError('');
     setIsSubmitting(true);
     try {
-      if (isRegistering) {
-        const required = profile.role === 'student'
-          ? [profile.fullName, profile.indexNumber, profile.email, profile.program, profile.certificate, profile.year]
-          : profile.role === 'lecturer'
-            ? [profile.fullName, profile.email, profile.phone, profile.department, profile.courses.length ? 'courses-selected' : '', profile.accessCode]
-            : [profile.fullName, profile.email, profile.phone, profile.department, profile.accessCode];
-        if (required.some(value => !value.trim())) throw new Error('Complete all required registration fields before continuing with Google.');
-      }
-      await signInWithGoogle(isRegistering ? profile : (identityNumber.trim() ? { identityNumber: identityNumber.trim() } : null));
+      await signInWithGoogle(null);
     } catch (googleError) {
       setError(googleError.message || 'Google sign-in could not be started.');
       setIsSubmitting(false);
@@ -73,41 +92,12 @@ export default function Login() {
   };
 
   if (googleVerificationPending) {
-    return (
-      <div className="login-container animate-fade-in">
-        <div className="login-card glass-panel verified-card">
-          <div className="login-header"><div className="ttu-logo-sim"><img src={ttuLogo} alt="Takoradi Technical University Logo" className="ttu-logo-img" /></div></div>
-          <div className="verification-check" aria-hidden="true">✓</div>
-          <h1>Your Google account has been verified.</h1>
-          <p className="subtitle verification-copy">Your TTU Design Hub profile is ready. Continue securely to your dashboard.</p>
-          <button type="button" className="btn btn-primary w-full" onClick={confirmGoogleVerification}>Continue to TTU Design Hub</button>
-        </div>
-      </div>
-    );
+    return <div className="login-container animate-fade-in"><div className="login-card glass-panel verified-card"><div className="login-header"><div className="ttu-logo-sim"><img src={ttuLogo} alt="Takoradi Technical University Logo" className="ttu-logo-img" /></div></div><div className="verification-check" aria-hidden="true">OK</div><h1>Your Google account has been verified.</h1><p className="subtitle verification-copy">Your TTU Design Hub profile is ready.</p><button type="button" className="btn btn-primary w-full" onClick={confirmGoogleVerification}>Continue to TTU Design Hub</button></div></div>;
   }
 
-  return (
-    <div className="login-container animate-fade-in">
-      <main className="login-card glass-panel google-login-card">
-        <div className="login-header"><div className="ttu-logo-sim"><img src={ttuLogo} alt="Takoradi Technical University Logo" className="ttu-logo-img" /></div><h1>{isRegistering ? 'Digital Dashboard Reminded' : 'Welcome'}</h1><p className="subtitle">{isRegistering ? 'Complete your academic profile, then verify it securely with Google.' : 'Sign in with your verified Google account to access your academic workspace.'}</p></div>
-        {error && <div className="login-error-alert"><span>Warning: {error}</span></div>}
-        {notice && <div className="login-success-alert"><span>{notice}</span></div>}
-        {!isRegistering && <div className="login-form"><div className="form-group"><label htmlFor="staff-identity">Lecturer ID or Staff ID <span className="optional-label">(optional)</span></label><input id="staff-identity" value={identityNumber} onChange={event => setIdentityNumber(event.target.value)} placeholder="Enter your ID before Google sign-in" autoComplete="username" /></div></div>}
-        {isRegistering && <div className="login-form registration-form">
-          <div className="form-group"><label>Role</label><select value={profile.role} onChange={e => setProfile({ ...profile, role: e.target.value })}><option value="student">Student</option><option value="lecturer">Lecturer</option><option value="admin">Administration Staff</option></select></div>
-          <div className="form-group"><label>Full Name</label><input value={profile.fullName} onChange={e => setProfile({ ...profile, fullName: e.target.value })} /></div>
-          {profile.role === 'student' && <><div className="form-group"><label>Index Number</label><input value={profile.indexNumber} onChange={e => setProfile({ ...profile, indexNumber: e.target.value })} /></div><div className="form-group"><label>Gmail Address</label><input type="email" value={profile.email} onChange={e => setProfile({ ...profile, email: e.target.value })} /></div><div className="form-group"><label>Program</label><input value={profile.program} onChange={e => setProfile({ ...profile, program: e.target.value })} /></div><div className="student-signup-row"><div className="form-group"><label>Certificate Type</label><select value={profile.certificate} onChange={e => setProfile({ ...profile, certificate: e.target.value })}><option>BTech</option><option>HND</option><option>Diploma</option></select></div><div className="form-group"><label>Level</label><select value={profile.year} onChange={e => setProfile({ ...profile, year: e.target.value })}>{['Year 1','Year 2','Year 3','Year 4'].map(year => <option key={year}>{year}</option>)}</select></div></div></>}
-          {profile.role === 'lecturer' && <><div className="form-group"><label>Lecturer ID <span className="optional-label">(optional)</span></label><input value={profile.lecturerId} onChange={e => setProfile({ ...profile, lecturerId: e.target.value })} /></div><ProfileContact profile={profile} setProfile={setProfile} departmentLabel="Department" /><AccessCodeField profile={profile} setProfile={setProfile} /><div className="form-group"><label htmlFor="courses">Courses Taught</label><select id="courses" multiple size="5" value={profile.courses} onChange={e => setProfile({ ...profile, courses: [...e.target.selectedOptions].map(option => option.value) })}>{COURSE_OPTIONS.map(course => <option key={course} value={course}>{course}</option>)}</select></div></>}
-          {profile.role === 'admin' && <><div className="form-group"><label>Staff ID <span className="optional-label">(optional)</span></label><input value={profile.staffId} onChange={e => setProfile({ ...profile, staffId: e.target.value })} /></div><ProfileContact profile={profile} setProfile={setProfile} departmentLabel="Department or Unit" /><AccessCodeField profile={profile} setProfile={setProfile} /></>}
-        </div>}
-        <button type="button" className="btn google-sign-in w-full" disabled={isSubmitting} onClick={handleGoogleSignIn}><span className="google-mark" aria-hidden="true">G</span>{isSubmitting ? 'Connecting to Google...' : 'Continue with Google'}</button>
-        <p className="google-account-note">First-time users receive a secure TTU Design Hub profile automatically.</p>
-        <div className="switch-mode-text"><button type="button" className="text-link" onClick={() => { setIsRegistering(!isRegistering); setError(''); }}>{isRegistering ? 'Already registered? Continue with Google' : 'New to TTU Design Hub? Register your profile'}</button></div>
-        <div className="login-footer"><p>© 2026 Takoradi Technical University</p><p>Faculty of Applied Arts & Technology</p></div>
-      </main>
-    </div>
-  );
+  return <div className="login-container animate-fade-in"><main className="login-card glass-panel google-login-card"><div className="login-header"><div className="ttu-logo-sim"><img src={ttuLogo} alt="Takoradi Technical University Logo" className="ttu-logo-img" /></div><h1>{isRegistering ? 'Digital Dashboard Reminded' : 'Welcome'}</h1><p className="subtitle">{isRegistering ? 'Create your portal account with your email and password.' : 'Sign in to your academic workspace.'}</p></div>{error && <div className="login-error-alert"><span>{error}</span></div>}{notice && <div className="login-success-alert"><span>{notice}</span></div>}<form className="login-form registration-form" onSubmit={handlePasswordSubmit}>{isRegistering ? <RegistrationFields profile={profile} updateProfile={updateProfile} /> : <><div className="form-group"><label>Email Address</label><input type="email" value={email} onChange={event => setEmail(event.target.value)} autoComplete="email" required /></div><div className="form-group"><label>Password</label><input type="password" value={password} onChange={event => setPassword(event.target.value)} autoComplete="current-password" required /></div></>}<button type="submit" className="btn btn-primary w-full" disabled={isSubmitting}>{isSubmitting ? 'Please wait...' : isRegistering ? 'Create Account' : 'Sign In'}</button></form><button type="button" className="btn google-sign-in w-full" disabled={isSubmitting} onClick={handleGoogleSignIn}><span className="google-mark" aria-hidden="true">G</span>Continue with Google</button><div className="switch-mode-text"><button type="button" className="text-link" onClick={() => { setIsRegistering(value => !value); setError(''); setNotice(''); }}>{isRegistering ? 'Already registered? Sign in' : 'New to TTU Design Hub? Register your profile'}</button></div><div className="login-footer"><p>Copyright 2026 Takoradi Technical University</p><p>Faculty of Applied Arts and Technology</p></div></main></div>;
 }
 
-function ProfileContact({ profile, setProfile, departmentLabel = 'Department' }) { return <><div className="form-group"><label>Email</label><input type="email" value={profile.email} onChange={e => setProfile({ ...profile, email: e.target.value })} /></div><div className="form-group"><label>Phone Number</label><input type="tel" value={profile.phone} onChange={e => setProfile({ ...profile, phone: e.target.value })} /></div><div className="form-group"><label>{departmentLabel}</label><input value={profile.department} onChange={e => setProfile({ ...profile, department: e.target.value })} /></div></>; }
-function AccessCodeField({ profile, setProfile }) { return <div className="form-group"><label>Role Registration Code</label><input type="password" value={profile.accessCode} onChange={e => setProfile({ ...profile, accessCode: e.target.value })} autoComplete="off" /></div>; }
+function RegistrationFields({ profile, updateProfile }) {
+  return <><div className="form-group"><label>Role</label><select value={profile.role} onChange={event => updateProfile('role', event.target.value)}><option value="student">Student</option><option value="lecturer">Lecturer</option></select></div><div className="form-group"><label>Full Name</label><input value={profile.fullName} onChange={event => updateProfile('fullName', event.target.value)} required /></div><div className="form-group"><label>Email Address</label><input type="email" value={profile.email} onChange={event => updateProfile('email', event.target.value)} autoComplete="email" required /></div><div className="form-group"><label>Password</label><input type="password" value={profile.password} onChange={event => updateProfile('password', event.target.value)} autoComplete="new-password" minLength="6" required /></div>{profile.role === 'student' ? <><div className="form-group"><label>Index Number</label><input value={profile.indexNumber} onChange={event => updateProfile('indexNumber', event.target.value)} required /></div><div className="form-group"><label>Program</label><input value={profile.program} onChange={event => updateProfile('program', event.target.value)} required /></div><div className="student-signup-row"><div className="form-group"><label>Certificate Type</label><select value={profile.certificate} onChange={event => updateProfile('certificate', event.target.value)}><option>BTech</option><option>HND</option><option>Diploma</option></select></div><div className="form-group"><label>Level</label><select value={profile.year} onChange={event => updateProfile('year', event.target.value)}>{['Year 1', 'Year 2', 'Year 3', 'Year 4'].map(year => <option key={year}>{year}</option>)}</select></div></div></> : <><div className="form-group"><label>Lecturer ID <span className="optional-label">(optional)</span></label><input value={profile.lecturerId} onChange={event => updateProfile('lecturerId', event.target.value)} /></div><div className="form-group"><label>Phone Number</label><input type="tel" value={profile.phone} onChange={event => updateProfile('phone', event.target.value)} required /></div><div className="form-group"><label>Department</label><input value={profile.department} onChange={event => updateProfile('department', event.target.value)} required /></div><div className="form-group"><label>Courses Taught <span className="optional-label">(comma-separated)</span></label><input placeholder="e.g. Layout Design II, Vector Graphics I" value={Array.isArray(profile.courses) ? profile.courses.join(', ') : profile.courses || ''} onChange={event => updateProfile('courses', event.target.value.split(',').map(c => c.trim()).filter(Boolean))} /></div></>}</>;
+}
