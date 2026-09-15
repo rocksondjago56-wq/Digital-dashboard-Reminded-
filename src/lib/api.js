@@ -6,8 +6,14 @@
  * is always verified before any dashboard is opened.
  */
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3001/api';
+const API_BASE = import.meta.env.VITE_API_BASE?.trim().replace(/\/$/, '');
 const TOKEN_KEY = 'ttu_api_token';
+
+export const isApiConfigured = Boolean(API_BASE);
+
+if (import.meta.env.DEV) {
+  console.info('[TTU API] VITE_API_BASE:', API_BASE || '(not set)');
+}
 
 /**
  * Get the stored JWT token.
@@ -39,13 +45,19 @@ export function clearToken() {
  * Returns true if the health endpoint responds.
  */
 export async function isApiAvailable() {
+  if (!isApiConfigured) return false;
+
   try {
     const response = await fetch(`${API_BASE}/health`, {
       method: 'GET',
-      signal: AbortSignal.timeout(2000) // 2 second timeout
+      signal: AbortSignal.timeout(15000)
     });
-    return response.ok;
-  } catch {
+    const health = response.ok ? await response.json() : null;
+    const available = health?.status === 'ok';
+    if (import.meta.env.DEV) console.info('[TTU API] Health check:', { apiBase: API_BASE, available, health });
+    return available;
+  } catch (error) {
+    if (import.meta.env.DEV) console.error('[TTU API] Health check failed:', { apiBase: API_BASE, error });
     return false;
   }
 }
@@ -55,6 +67,10 @@ export async function isApiAvailable() {
  * Automatically includes the JWT token if available.
  */
 async function request(endpoint, options = {}) {
+  if (!isApiConfigured) {
+    throw new Error('VITE_API_BASE is not configured.');
+  }
+
   const token = getToken();
   const headers = {
     'Content-Type': 'application/json',
@@ -62,15 +78,20 @@ async function request(endpoint, options = {}) {
     ...options.headers
   };
 
-  const response = await fetch(`${API_BASE}${endpoint}`, {
-    ...options,
-    headers
-  });
+  let response;
+  try {
+    response = await fetch(`${API_BASE}${endpoint}`, { ...options, headers });
+  } catch (error) {
+    if (import.meta.env.DEV) console.error('[TTU API] Request failed:', { apiBase: API_BASE, endpoint, error });
+    throw error;
+  }
 
-  const data = await response.json();
+  const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    throw new Error(data.error || `Request failed with status ${response.status}`);
+    const error = new Error(data.error || `Request failed with status ${response.status}`);
+    if (import.meta.env.DEV) console.error('[TTU API] Request failed:', { apiBase: API_BASE, endpoint, status: response.status, error });
+    throw error;
   }
 
   return data;
@@ -86,12 +107,6 @@ export const api = {
       request('/auth/login', {
         method: 'POST',
         body: JSON.stringify({ identifier, password })
-      }),
-
-    signup: (data) =>
-      request('/auth/signup', {
-        method: 'POST',
-        body: JSON.stringify(data)
       }),
 
     me: () => request('/auth/me'),

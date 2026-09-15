@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { DbContext } from './DbContextDefinition';
-import { api, isApiAvailable, getToken, setToken, clearToken } from '../lib/api';
+import { api, isApiAvailable, isApiConfigured, getToken, setToken, clearToken } from '../lib/api';
 import { createClassGroupTitle } from '../utils/whatsapp';
 import { signOutOfGoogle } from '../lib/supabase';
 
@@ -618,31 +618,34 @@ export const DbProvider = ({ children }) => {
   };
 
   const googleSignIn = async (accessToken, _googleUser, profile = null) => {
-    if (useApi) {
-      try {
-        const result = await api.auth.googleSignIn(accessToken, profile);
-        if (result.success) {
-          setToken(result.token);
-          setCurrentUser(result.user);
-          if (result.user.role === 'admin') await refreshTestRoleManagementAccess();
-          setGoogleVerificationPending(true);
-          await refreshRemoteData();
-          addNotification(`User ${result.user.name} signed in with Google.`);
-          return { success: true, user: result.user };
-        }
-        return { success: false, message: result.error || 'Google sign-in failed.' };
-      } catch (error) {
-        return { success: false, message: error.message || 'The secure TTU sign-in service is unavailable. Please try again.' };
-      }
+    // Render services can wake after the app initializes, so recheck the
+    // configured backend immediately before reporting an unavailable service.
+    const backendReady = useApi || await isApiAvailable();
+    if (!backendReady) {
+      return {
+        success: false,
+        message: isApiConfigured
+          ? 'The secure TTU sign-in service is temporarily unavailable. Please try again shortly.'
+          : 'The secure TTU sign-in service is not connected. Configure and deploy the backend, then set VITE_API_BASE to its public API URL.'
+      };
     }
 
-    // Never fall back to browser storage for Google authentication. Doing so
-    // would bypass the Supabase profile role and can incorrectly show a
-    // student dashboard for a lecturer or administrator.
-    return {
-      success: false,
-      message: 'The secure TTU sign-in service is not connected. Configure and deploy the backend, then set VITE_API_BASE to its public API URL.'
-    };
+    setUseApi(true);
+    try {
+      const result = await api.auth.googleSignIn(accessToken, profile);
+      if (result.success) {
+        setToken(result.token);
+        setCurrentUser(result.user);
+        if (result.user.role === 'admin') await refreshTestRoleManagementAccess();
+        setGoogleVerificationPending(true);
+        await refreshRemoteData();
+        addNotification(`User ${result.user.name} signed in with Google.`);
+        return { success: true, user: result.user };
+      }
+      return { success: false, message: result.error || 'Google sign-in failed.' };
+    } catch (error) {
+      return { success: false, message: error.message || 'The secure TTU sign-in service is unavailable. Please try again.' };
+    }
 
   };
 
