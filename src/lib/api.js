@@ -6,13 +6,18 @@
  * is always verified before any dashboard is opened.
  */
 
-const API_BASE = import.meta.env.VITE_API_BASE?.trim().replace(/\/$/, '');
+const configuredApiBase = import.meta.env.VITE_API_BASE?.trim().replace(/\/$/, '');
+// Vercel may be configured with the Render origin or the full /api URL. The
+// Express backend mounts every portal endpoint beneath /api, so support both.
+const API_BASE = configuredApiBase
+  ? (configuredApiBase.endsWith('/api') ? configuredApiBase : `${configuredApiBase}/api`)
+  : '';
 const TOKEN_KEY = 'ttu_api_token';
 
 export const isApiConfigured = Boolean(API_BASE);
 
 if (import.meta.env.DEV) {
-  console.info('[TTU API] VITE_API_BASE:', API_BASE || '(not set)');
+  console.info('[TTU API] VITE_API_BASE:', configuredApiBase || '(not set)', 'Resolved API base:', API_BASE || '(not set)');
 }
 
 /**
@@ -191,6 +196,12 @@ export const api = {
     roleManagementAccess: () => request('/users/role-management-access'),
 
     createRegistrationCode: (role, expiresInHours) => request('/users/registration-codes', { method: 'POST', body: JSON.stringify({ role, expiresInHours }) }),
+
+    listRegistrationCodes: () => request('/users/registration-codes'),
+
+    revokeRegistrationCode: (id) => request(`/users/registration-codes/${id}/revoke`, { method: 'POST' }),
+
+    approveAdministrator: (id) => request(`/users/${id}/approve-administrator`, { method: 'POST' }),
 
     updateRole: (id, role) =>
       request(`/users/${id}/role`, {

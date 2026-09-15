@@ -41,7 +41,16 @@ app.use(express.urlencoded({ extended: true }));
 // Serve uploaded files
 app.use('/uploads', express.static('uploads'));
 
-// Health check
+// Render root and health checks. Portal endpoints remain under /api.
+app.get('/', (_req, res) => {
+  res.json({ status: 'ok', service: 'TTU Dashboard API', health: '/api/health' });
+});
+
+app.get('/health', (_req, res) => {
+  res.json({ status: 'ok', service: 'TTU Dashboard API' });
+});
+
+// API health check
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
@@ -60,7 +69,7 @@ app.use((err, _req, res, _next) => {
   res.status(500).json({ error: 'Internal server error.' });
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`\n  🚀 TTU Dashboard API Server`);
   console.log(`  ➜ Local:   http://localhost:${PORT}`);
   console.log(`  ➜ Health:  http://localhost:${PORT}/api/health`);
