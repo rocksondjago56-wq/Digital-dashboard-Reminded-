@@ -6,15 +6,28 @@ import { getSupabaseSession, saveSupabaseProfile, signInWithEmailPassword, signI
 
 const EMPTY_PROFILE = { role: 'student', fullName: '', indexNumber: '', email: '', password: '', program: '', certificate: 'BTech', year: 'Year 1', lecturerId: '', phone: '', department: 'Graphic Design', courses: [], position: 'Department Administrator', accessCode: '' };
 
+async function sendPasswordReset(email) {
+  const { createClient } = await import('@supabase/supabase-js');
+  const supabase = createClient(
+    import.meta.env.VITE_SUPABASE_URL,
+    import.meta.env.VITE_SUPABASE_ANON_KEY
+  );
+  return supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin
+  });
+}
+
 export default function Login() {
   const { googleSignIn, googleVerificationPending, confirmGoogleVerification, passwordPortalSignIn } = useContext(DbContext);
   const [isRegistering, setIsRegistering] = useState(false);
+  const [showEmailSignIn, setShowEmailSignIn] = useState(false);
   const [profile, setProfile] = useState(EMPTY_PROFILE);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [forgotPasswordSent, setForgotPasswordSent] = useState(false);
   const handledGoogleSession = useRef(false);
 
   const updateProfile = (field, value) => setProfile(current => ({ ...current, [field]: value }));
@@ -154,6 +167,26 @@ export default function Login() {
     }
   };
 
+  const handleForgotPassword = async () => {
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail) {
+      setError('Enter your email address above, then click "Forgot Password?".');
+      return;
+    }
+    setIsSubmitting(true);
+    setError('');
+    try {
+      const { error: resetError } = await sendPasswordReset(trimmedEmail);
+      if (resetError) throw resetError;
+      setForgotPasswordSent(true);
+      setNotice(`Password reset link sent to ${trimmedEmail}. Check your inbox.`);
+    } catch (resetErr) {
+      setError(resetErr?.message || 'Could not send password reset email. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   if (googleVerificationPending) {
     return <div className="login-container animate-fade-in"><div className="login-card glass-panel verified-card"><div className="login-header"><div className="ttu-logo-sim"><img src={ttuLogo} alt="Takoradi Technical University Logo" className="ttu-logo-img" /></div></div><div className="verification-check" aria-hidden="true">OK</div><h1>Your Google account has been verified.</h1><p className="subtitle verification-copy">Your TTU Design Hub profile is ready.</p><button type="button" className="btn btn-primary w-full" onClick={confirmGoogleVerification}>Continue to TTU Design Hub</button></div></div>;
   }
@@ -165,9 +198,9 @@ export default function Login() {
           <div className="ttu-logo-sim">
             <img src={ttuLogo} alt="Takoradi Technical University Logo" className="ttu-logo-img" />
           </div>
-          <h1>{isRegistering ? 'Digital Dashboard Reminded' : 'Welcome'}</h1>
+          <h1>{isRegistering ? 'Create Your Account' : 'Welcome Back'}</h1>
           <p className="subtitle">
-            {isRegistering ? 'Create your portal account with your email and password.' : 'Sign in to your academic workspace.'}
+            {isRegistering ? 'Set up your TTU Design Hub portal account.' : 'Sign in to your academic workspace.'}
           </p>
         </div>
 
@@ -203,6 +236,55 @@ export default function Login() {
               </svg>
               <span>Continue with Google</span>
             </button>
+
+            <div className="sign-in-divider"><span>or sign in with email</span></div>
+
+            {showEmailSignIn ? (
+              <form className="email-signin-section animate-fade-in" onSubmit={handlePasswordSubmit}>
+                <div className="form-group">
+                  <label htmlFor="signin-email">Email Address</label>
+                  <input
+                    id="signin-email"
+                    type="email"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    autoComplete="email"
+                    placeholder="your@email.com"
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="signin-password">Password</label>
+                  <input
+                    id="signin-password"
+                    type="password"
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    autoComplete="current-password"
+                    placeholder="Your password"
+                    required
+                  />
+                </div>
+                <button type="submit" className="btn btn-primary w-full" disabled={isSubmitting}>
+                  {isSubmitting ? 'Signing in...' : 'Sign In with Email'}
+                </button>
+                {forgotPasswordSent ? (
+                  <p className="forgot-password-sent">✅ Reset link sent! Check your inbox.</p>
+                ) : (
+                  <button type="button" className="forgot-password-link" onClick={handleForgotPassword} disabled={isSubmitting}>
+                    Forgot Password?
+                  </button>
+                )}
+              </form>
+            ) : (
+              <button
+                type="button"
+                className="btn btn-outline-secondary w-full"
+                onClick={() => setShowEmailSignIn(true)}
+              >
+                Sign in with Email &amp; Password
+              </button>
+            )}
           </div>
         ) : (
           <>

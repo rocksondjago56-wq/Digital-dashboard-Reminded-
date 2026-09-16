@@ -180,6 +180,9 @@ export default function LecturerDashboard() {
           </button>
           <button onClick={() => setShowAnnounceForm(!showAnnounceForm)} className="btn btn-accent">
             {showAnnounceForm ? 'Close Portal' : '📢 Post Notice'}
+            {filteredAnnouncements.length > 0 && !showAnnounceForm && (
+              <span className="lect-ann-badge">{filteredAnnouncements.length}</span>
+            )}
           </button>
         </div>
       </header>

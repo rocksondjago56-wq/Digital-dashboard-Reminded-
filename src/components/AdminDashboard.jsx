@@ -499,6 +499,7 @@ export default function AdminDashboard() {
           onClick={() => switchAdminTab('users')}
         >
           👥 User Administration
+          {users.length > 0 && <span className="nav-badge">{users.length}</span>}
         </button>
         <button
           className={`admin-nav-btn ${adminTab === 'identities' ? 'active' : ''}`}
@@ -1022,15 +1023,49 @@ export default function AdminDashboard() {
             </form>
             <div className="admin-data-list mt-2">
               <h4>Registration Code History</h4>
-              {registrationCodes.length === 0 ? <p>No registration codes have been generated yet.</p> : registrationCodes.map(code => (
-                <div className="admin-data-row" key={code.id}>
-                  <div className="admin-row-info">
-                    <h4>{code.role}</h4>
-                    <span className="row-meta">Expires: {new Date(code.expiresAt).toLocaleString()} | {code.usedAt ? 'Used' : code.revokedAt ? 'Revoked' : 'Active'}</span>
-                  </div>
-                  {!code.usedAt && !code.revokedAt && <button type="button" className="btn-icon-danger" onClick={() => handleRevokeRegistrationCode(code.id)}>Revoke</button>}
+              {registrationCodes.length === 0 ? (
+                <p style={{ color: '#64748b', fontSize: '0.9rem' }}>No registration codes have been generated yet.</p>
+              ) : (
+                <div className="reg-codes-table-wrapper">
+                  <table className="reg-codes-table">
+                    <thead>
+                      <tr>
+                        <th>Role</th>
+                        <th>Expires</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {registrationCodes.map(code => {
+                        const isActive = !code.usedAt && !code.revokedAt;
+                        const statusLabel = code.usedAt ? 'Used' : code.revokedAt ? 'Revoked' : 'Active';
+                        const statusClass = code.usedAt ? 'badge-gold' : code.revokedAt ? 'badge-danger' : 'badge-success';
+                        return (
+                          <tr key={code.id}>
+                            <td><span className="badge badge-blue" style={{ textTransform: 'capitalize' }}>{code.role}</span></td>
+                            <td style={{ fontSize: '0.82rem', color: '#475569' }}>{new Date(code.expiresAt).toLocaleString()}</td>
+                            <td><span className={`badge ${statusClass}`}>{statusLabel}</span></td>
+                            <td>
+                              {isActive ? (
+                                <button
+                                  type="button"
+                                  className="btn-icon-danger"
+                                  onClick={() => handleRevokeRegistrationCode(code.id)}
+                                >
+                                  Revoke
+                                </button>
+                              ) : (
+                                <span style={{ color: '#94a3b8', fontSize: '0.8rem' }}>—</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
-              ))}
+              )}
             </div>
             
             <div className="users-table-container mt-2">

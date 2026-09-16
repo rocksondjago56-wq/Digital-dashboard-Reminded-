@@ -686,7 +686,15 @@ export default function StudentDashboard() {
 
             <div className="timetable-list">
               {visibleTimetable.length === 0 ? (
-                <p className="empty-sidebar-text">No classes published yet.</p>
+                <div className="timetable-empty-state">
+                  <span style={{ fontSize: '2rem' }}>📅</span>
+                  <p style={{ fontWeight: 600, color: '#1e293b', margin: '8px 0 4px' }}>No classes scheduled yet</p>
+                  <p style={{ fontSize: '0.82rem', color: '#64748b', margin: 0 }}>
+                    {canManageTimetable
+                      ? 'Click "Add Class" above to add your first timetable slot.'
+                      : 'Your class schedule has not been published yet. Check back later.'}
+                  </p>
+                </div>
               ) : (
                 visibleTimetable.map(slot => (
                   <div key={slot.id} className="timetable-slot">

@@ -307,3 +307,82 @@
   background-color: #f8fafc;
 }
 
+/* ── Email Sign-in Section ──────────────────────────────────── */
+.email-signin-section {
+  margin-top: 4px;
+}
+
+.email-signin-section .form-group {
+  margin-bottom: 14px;
+}
+
+.btn-outline-secondary {
+  background: transparent;
+  border: 1.5px solid #cbd5e1;
+  color: #475569;
+  font-weight: 600;
+  padding: 10px 20px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 0.92rem;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn-outline-secondary:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+  color: #1e293b;
+}
+
+/* Forgot Password */
+.forgot-password-link {
+  display: block;
+  text-align: center;
+  margin-top: 10px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #2563eb;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+  width: 100%;
+  transition: color 0.2s;
+}
+
+.forgot-password-link:hover:not(:disabled) {
+  color: #1d4ed8;
+}
+
+.forgot-password-link:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.forgot-password-sent {
+  text-align: center;
+  color: #16a34a;
+  font-size: 0.87rem;
+  font-weight: 600;
+  margin-top: 10px;
+  padding: 8px 12px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: var(--radius-sm);
+}
+
+/* Google large icon */
+.google-large-logo-wrap {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.google-large-icon {
+  opacity: 0.9;
+}

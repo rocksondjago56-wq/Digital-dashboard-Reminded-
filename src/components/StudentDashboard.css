@@ -1132,3 +1132,13 @@
   color: #0f172a;
   transform: translateY(-1px);
 }
+
+/* ── Timetable Empty State ─────────────────────────────────── */
+.timetable-empty-state {
+  text-align: center;
+  padding: 24px 16px;
+  border-radius: var(--radius-sm);
+  background: #f8fafc;
+  border: 1.5px dashed #cbd5e1;
+  margin-top: 8px;
+}
