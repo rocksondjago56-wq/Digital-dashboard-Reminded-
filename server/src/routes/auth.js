@@ -89,40 +89,53 @@ async function exchangePasswordAccount(accessToken, rawProfile = {}) {
     throw new Error('Use the same email address used during registration.');
   }
 
+  // Determine if this is a registration attempt (role explicitly selected in the form)
+  // vs a plain sign-in (no profile submitted, so profile.role is undefined).
+  const profileRole = ['student', 'lecturer', 'admin'].includes(profile.role) ? profile.role : null;
+
+  // ─── FAST SIGN-IN PATH ────────────────────────────────────────────────────
+  // For returning users signing in (not registering), read the role directly
+  // from Prisma. Never let the Supabase profile overwrite it — Supabase may
+  // still have a stale 'student' role if SUPABASE_SERVICE_ROLE_KEY was missing.
+  if (!profileRole && process.env.DATABASE_URL) {
+    try {
+      const existingUser = await prisma.user.findUnique({ where: { email } });
+      if (existingUser) {
+        const completedDeadlines = (['student', 'student_head'].includes(existingUser.role))
+          ? (await prisma.deadlineCompletion.findMany({ where: { studentId: existingUser.id }, select: { deadlineId: true } }).catch(() => [])).map(item => item.deadlineId)
+          : [];
+        console.info('[auth] Fast sign-in (existing Prisma user)', { userId: existingUser.id, email, role: existingUser.role });
+        return { token: generateToken(existingUser), user: formatUser(existingUser, completedDeadlines) };
+      }
+    } catch (lookupErr) {
+      console.warn('[auth] Fast sign-in lookup failed, falling through to registration path:', lookupErr.message);
+    }
+  }
+
+  // ─── REGISTRATION PATH ───────────────────────────────────────────────────
+  // New user, or user explicitly re-registering with a new role.
+  if (!process.env.DATABASE_URL) {
+    throw new Error('Database connection is not configured on Render (missing DATABASE_URL). Please configure DATABASE_URL in Render environment settings.');
+  }
+
   let supabaseProfile = await ensureSupabaseProfile(accessToken, authUser);
   const metadata = authUser.user_metadata || {};
-
-  // profileRole is only set when the user explicitly submits a registration form
-  // (profile.role is present). Regular sign-ins pass no profile, so profileRole is null.
-  const profileRole = ['student', 'lecturer', 'admin'].includes(profile.role) ? profile.role : null;
   const metaRole = ['student', 'lecturer', 'admin'].includes(metadata.requested_role) ? metadata.requested_role : null;
 
-  // During registration (profileRole set): always apply the chosen role, even if
-  // the Supabase profile already has a stale 'student' role from a prior attempt.
+  // Apply the role from the registration form (overrides any stale Supabase value)
   if (profileRole && profileRole !== supabaseProfile.role) {
     if (profileRole === 'admin') {
       const isValid = await validateAdminAccessCode(profile.accessCode);
-      if (!isValid) {
-        throw new Error('A valid Administrator Access Code is required to register an Administrator account.');
-      }
+      if (!isValid) throw new Error('A valid Administrator Access Code is required to register an Administrator account.');
     }
     supabaseProfile = await updateSupabaseProfileRole(supabaseProfile.id, profileRole);
     supabaseProfile.role = profileRole;
   } else if (!supabaseProfile.role && metaRole) {
-    // Fallback: first-time Google sign-in where role came from OAuth metadata
-    if (metaRole === 'admin') {
-      const isValid = await validateAdminAccessCode(profile.accessCode);
-      if (!isValid) {
-        throw new Error('A valid Administrator Access Code is required to register an Administrator account.');
-      }
-    }
     supabaseProfile = await updateSupabaseProfileRole(supabaseProfile.id, metaRole);
     supabaseProfile.role = metaRole;
   }
 
-  // Use the now-updated supabaseProfile role; fall back to 'student' if still unset
-  let role = supabaseProfile.role || 'student';
-
+  const role = profileRole || supabaseProfile.role || 'student';
   const name = profile.fullName?.trim() || metadata.name || metadata.full_name || email.split('@')[0];
   const courses = Array.isArray(profile.courses) ? profile.courses.filter(Boolean) : (metadata.requested_courses || []);
   const registrationFields = {
@@ -135,10 +148,6 @@ async function exchangePasswordAccount(accessToken, rawProfile = {}) {
     designation: role === 'admin' ? profile.position?.trim() || metadata.designation || 'Department Administrator' : null,
     courses: role === 'lecturer' ? courses : []
   };
-
-  if (!process.env.DATABASE_URL) {
-    throw new Error('Database connection is not configured on Render (missing DATABASE_URL). Please configure DATABASE_URL in Render environment settings.');
-  }
 
   let user;
   try {
@@ -156,7 +165,7 @@ async function exchangePasswordAccount(accessToken, rawProfile = {}) {
       }
     });
   } catch (dbError) {
-    console.error('[auth] Prisma user.upsert error during password sign-in:', dbError);
+    console.error('[auth] Prisma user.upsert error during registration:', dbError);
     if (dbError.code === 'P2002') {
       const target = dbError.meta?.target || [];
       const fieldName = Array.isArray(target) ? target.join(', ') : 'field';
@@ -168,7 +177,7 @@ async function exchangePasswordAccount(accessToken, rawProfile = {}) {
   const completedDeadlines = (role === 'student' || role === 'student_head')
     ? (await prisma.deadlineCompletion.findMany({ where: { studentId: user.id }, select: { deadlineId: true } }).catch(() => [])).map(item => item.deadlineId)
     : [];
-  console.info('[auth] Email/password role decision', { userId: user.id, email, role, dashboard: `${role}-dashboard` });
+  console.info('[auth] Registration/first-sign-in role decision', { userId: user.id, email, role, dashboard: `${role}-dashboard` });
   return { token: generateToken(user), user: formatUser(user, completedDeadlines) };
 }
 
@@ -222,11 +231,37 @@ router.post('/google-signin', async (req, res) => {
     const name = profile.fullName?.trim() || metadata.full_name || metadata.name || email.split('@')[0];
     const profilePictureUrl = metadata.avatar_url || metadata.picture || null;
 
-    // profileRole is set only during Google registration (user filled the registration form)
     const profileRole = ['student', 'lecturer', 'admin'].includes(profile.role) ? profile.role : null;
+
+    // ─── FAST SIGN-IN PATH (Google returning user) ───────────────────────────
+    // Read role from Prisma directly. Supabase profile cannot overwrite it.
+    if (!profileRole) {
+      try {
+        const existingUser = await prisma.user.findUnique({ where: { email } });
+        if (existingUser) {
+          // Update name/photo in case they changed, but preserve the stored role
+          const updatedUser = await prisma.user.update({
+            where: { email },
+            data: {
+              name,
+              profilePictureUrl: profilePictureUrl || existingUser.profilePictureUrl || undefined,
+              isVerified: true
+            }
+          });
+          const completedDeadlines = (['student', 'student_head'].includes(updatedUser.role))
+            ? (await prisma.deadlineCompletion.findMany({ where: { studentId: updatedUser.id }, select: { deadlineId: true } }).catch(() => [])).map(item => item.deadlineId)
+            : [];
+          console.info('[auth] Fast Google sign-in (existing Prisma user)', { userId: updatedUser.id, email, role: updatedUser.role });
+          return res.json({ success: true, token: generateToken(updatedUser), user: formatUser(updatedUser, completedDeadlines) });
+        }
+      } catch (lookupErr) {
+        console.warn('[auth] Fast Google sign-in lookup failed, falling through:', lookupErr.message);
+      }
+    }
+
+    // ─── REGISTRATION PATH (new Google user or re-registering) ───────────────
     const metaRole = ['student', 'lecturer', 'admin'].includes(metadata.requested_role) ? metadata.requested_role : null;
 
-    // During registration: always apply the chosen role even if profile already has 'student'
     if (profileRole && profileRole !== supabaseProfile.role) {
       if (profileRole === 'admin') {
         const isValid = await validateAdminAccessCode(profile.accessCode);
@@ -247,7 +282,7 @@ router.post('/google-signin', async (req, res) => {
       supabaseProfile.role = metaRole;
     }
 
-    let role = supabaseProfile.role || 'student';
+    const role = profileRole || supabaseProfile.role || 'student';
 
     const courses = Array.isArray(profile.courses) ? profile.courses.filter(Boolean) : (metadata.requested_courses || []);
     const registrationFields = {
