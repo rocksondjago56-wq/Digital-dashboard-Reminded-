@@ -1142,3 +1142,80 @@
   border: 1.5px dashed #cbd5e1;
   margin-top: 8px;
 }
+
+/* ── Deadline Countdown Progress Bar ─────────────────────────── */
+.deadline-countdown-bar-wrap {
+  height: 5px;
+  background: #e2e8f0;
+  border-radius: 10px;
+  margin: 10px 0 4px;
+  overflow: hidden;
+}
+
+.deadline-countdown-bar-fill {
+  height: 100%;
+  border-radius: 10px;
+  transition: width 0.6s ease, background 0.4s ease;
+}
+
+/* ── Urgency Border Accents on Deadline Cards ─────────────────── */
+.deadline-card.urgency-overdue {
+  border-left: 3px solid #ef4444;
+}
+
+.deadline-card.urgency-due-today {
+  border-left: 3px solid #f97316;
+  background: #fff7ed;
+}
+
+.deadline-card.urgency-urgent {
+  border-left: 3px solid #f97316;
+}
+
+.deadline-card.urgency-soon {
+  border-left: 3px solid #eab308;
+}
+
+.deadline-card.urgency-normal {
+  border-left: 3px solid #22c55e;
+}
+
+/* ── Days Badge extra "soon" state ────────────────────────────── */
+.days-badge.soon {
+  background: rgba(234, 179, 8, 0.15);
+  color: #a16207;
+  border: 1px solid rgba(234, 179, 8, 0.4);
+}
+
+/* ── Pinned Announcement Card ────────────────────────────────── */
+.announcement-card-item.pinned-announcement {
+  border-left: 4px solid #d97706;
+  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+}
+
+.pinned-announcement-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #92400e;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
+  padding: 4px 8px;
+  background: rgba(217, 119, 6, 0.12);
+  border-radius: 6px;
+  width: fit-content;
+}
+
+@keyframes pin-pulse {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-15deg); }
+  75% { transform: rotate(10deg); }
+}
+
+.pin-pulse {
+  display: inline-block;
+  animation: pin-pulse 2s ease-in-out infinite;
+}

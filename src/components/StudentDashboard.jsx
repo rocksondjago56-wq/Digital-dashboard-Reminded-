@@ -99,7 +99,24 @@ export default function StudentDashboard() {
     if (days === 0) return { text: 'Due Today!', class: 'due-today' };
     if (days === 1) return { text: 'Due Tomorrow', class: 'urgent' };
     if (days <= 3) return { text: `${days} days left`, class: 'urgent' };
+    if (days <= 7) return { text: `${days} days left`, class: 'soon' };
     return { text: `${days} days remaining`, class: 'normal' };
+  };
+
+  // Compute progress bar fill (0–100%) for deadline urgency.
+  // Full bar = overdue/today. Shrinks as deadline is further away (cap at 30 days).
+  const getCountdownProgress = (days) => {
+    if (days <= 0) return 100;
+    const MAX_DAYS = 30;
+    const ratio = Math.max(0, (MAX_DAYS - days) / MAX_DAYS);
+    return Math.round(ratio * 100);
+  };
+
+  const getCountdownBarColor = (days) => {
+    if (days <= 0) return '#ef4444';
+    if (days <= 3) return '#f97316';
+    if (days <= 7) return '#eab308';
+    return '#22c55e';
   };
 
   // Filter deadlines
@@ -312,7 +329,7 @@ export default function StudentDashboard() {
                   const isDone = completedList.includes(d.id);
 
                   return (
-                    <div key={d.id} className={`deadline-card ${isDone ? 'completed' : ''}`}>
+                    <div key={d.id} className={`deadline-card ${isDone ? 'completed' : ''} urgency-${remainingStatus.class}`}>
                       <div className="deadline-check">
                         <input
                           type="checkbox"
@@ -336,6 +353,19 @@ export default function StudentDashboard() {
                         </div>
                         <h3 className="deadline-title">{d.title}</h3>
                         <p className="deadline-desc">{d.description}</p>
+
+                        {/* Countdown Progress Bar */}
+                        {!isDone && (
+                          <div className="deadline-countdown-bar-wrap">
+                            <div
+                              className="deadline-countdown-bar-fill"
+                              style={{
+                                width: `${getCountdownProgress(daysRemaining)}%`,
+                                background: getCountdownBarColor(daysRemaining)
+                              }}
+                            />
+                          </div>
+                        )}
 
                         {/* Attached Assignment Document / Notes from Lecturer or Admin */}
                         {d.attachment?.dataUrl && (
@@ -464,13 +494,21 @@ export default function StudentDashboard() {
                 </div>
               ) : (
                 displayAnnouncements.map(a => (
-                  <div key={a.id} className={`announcement-card-item ${a.isPinned ? 'pinned' : ''}`}>
+                  <div key={a.id} className={`announcement-card-item ${a.isPinned ? 'pinned-announcement' : ''}`}>
                     {a.isPinned && (
-                      <span className="pin-marker">📌 Pinned Announcement</span>
+                      <div className="pinned-announcement-header">
+                        <span className="pin-pulse">📌</span>
+                        <span>Pinned Notice</span>
+                      </div>
                     )}
                     <div className="announcement-meta">
                       <span className="announcement-author">{a.author}</span>
                       <span className="announcement-date">📅 {a.date}</span>
+                      {a.category && a.category !== 'notice' && (
+                        <span className={`badge ${a.category === 'update' ? 'badge-gold' : 'badge-blue'}`} style={{ fontSize: '0.7rem' }}>
+                          {a.category === 'update' ? 'Academic Update' : 'Calendar Alert'}
+                        </span>
+                      )}
                     </div>
                     <h3 className="announcement-title">{a.title}</h3>
                     <p className="announcement-content-text">{a.content}</p>
