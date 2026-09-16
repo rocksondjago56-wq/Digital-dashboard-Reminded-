@@ -37,10 +37,10 @@ const getGoogleRedirectUrl = () => {
     && !/your-portal\.vercel\.app/i.test(publicAppUrl);
   if (isValidPublicUrl) return `${publicAppUrl}/`;
 
-  const isLocalHost = ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname);
-  return isLocalHost
-    ? `${LIVE_PORTAL_URL}/`
-    : `${window.location.origin}/`;
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    return `${window.location.origin}/`;
+  }
+  return `${LIVE_PORTAL_URL}/`;
 };
 
 export async function signInWithGoogle(profile = null) {
@@ -82,7 +82,18 @@ export async function getSupabaseSession() {
   if (!supabase) return null;
   const { data, error } = await supabase.auth.getSession();
   if (error) throw error;
-  return data.session;
+  let session = data?.session || null;
+  if (session?.expires_at && (session.expires_at * 1000) < Date.now()) {
+    try {
+      const { data: refreshData, error: refreshErr } = await supabase.auth.refreshSession();
+      if (!refreshErr && refreshData?.session) {
+        session = refreshData.session;
+      }
+    } catch {
+      // refresh failure fallback
+    }
+  }
+  return session;
 }
 
 export async function saveSupabaseProfile(profile) {
@@ -92,5 +103,11 @@ export async function saveSupabaseProfile(profile) {
 }
 
 export async function signOutOfGoogle() {
-  if (supabase) await supabase.auth.signOut();
+  if (supabase) {
+    try {
+      await supabase.auth.signOut();
+    } catch {
+      // ignore sign-out errors
+    }
+  }
 }

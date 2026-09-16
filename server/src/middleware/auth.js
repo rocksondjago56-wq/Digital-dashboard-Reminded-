@@ -17,7 +17,8 @@ export function authenticate(req, res, next) {
   const token = authHeader.split(' ')[1];
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const jwtSecret = process.env.JWT_SECRET || 'ttu-dashboard-jwt-fallback-secret-2026';
+    const decoded = jwt.verify(token, jwtSecret);
     // Attach user info from token
     prisma.user.findUnique({ where: { id: decoded.userId } })
       .then(user => {

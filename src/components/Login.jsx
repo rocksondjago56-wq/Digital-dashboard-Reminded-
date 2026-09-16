@@ -2,7 +2,7 @@ import React, { useContext, useEffect, useRef, useState } from 'react';
 import { DbContext } from '../context/DbContextDefinition';
 import './Login.css';
 import ttuLogo from '../ttu-logo.png.png';
-import { getSupabaseSession, saveSupabaseProfile, signInWithEmailPassword, signInWithGoogle, signUpWithEmailPassword } from '../lib/supabase';
+import { getSupabaseSession, saveSupabaseProfile, signInWithEmailPassword, signInWithGoogle, signUpWithEmailPassword, signOutOfGoogle } from '../lib/supabase';
 
 const EMPTY_PROFILE = { role: 'student', fullName: '', indexNumber: '', email: '', password: '', program: '', certificate: 'BTech', year: 'Year 1', lecturerId: '', phone: '', department: 'Graphic Design', courses: [] };
 
@@ -20,30 +20,80 @@ export default function Login() {
   const updateProfile = (field, value) => setProfile(current => ({ ...current, [field]: value }));
 
   useEffect(() => {
+    // 1. Check if OAuth redirected back with an error in URL hash or query params
+    const parseUrlError = () => {
+      try {
+        const hash = window.location.hash?.substring(1) || '';
+        const search = window.location.search?.substring(1) || '';
+        const params = new URLSearchParams(hash || search);
+        const errorDesc = params.get('error_description') || params.get('error');
+        if (errorDesc) {
+          window.history.replaceState(null, '', window.location.pathname);
+          return decodeURIComponent(errorDesc.replace(/\+/g, ' '));
+        }
+      } catch {
+        // ignore url parsing issues
+      }
+      return null;
+    };
+
+    const urlError = parseUrlError();
+    if (urlError) {
+      setError(urlError);
+      signOutOfGoogle().catch(() => {});
+      return;
+    }
+
     const restoreGoogleSession = async () => {
-      const session = await getSupabaseSession();
+      let session = null;
+      try {
+        session = await getSupabaseSession();
+      } catch (sessionErr) {
+        console.warn('[TTU Auth] Error reading Supabase session:', sessionErr);
+        setError(sessionErr?.message || 'Could not verify your authentication session. Please try again.');
+        await signOutOfGoogle().catch(() => {});
+        return;
+      }
+
       const isGoogleSession = session?.user?.app_metadata?.providers?.includes('google');
       if (!session?.access_token || !isGoogleSession || handledGoogleSession.current || googleVerificationPending) return;
       handledGoogleSession.current = true;
       setIsSubmitting(true);
+
       const rawSavedProfile = JSON.parse(sessionStorage.getItem('ttu_registration_profile') || 'null');
       const savedProfile = (rawSavedProfile && typeof rawSavedProfile === 'object') ? rawSavedProfile : {};
       if (savedProfile?.role) {
         const { accessCode: _accessCode, password: _password, ...metadata } = savedProfile;
-        await saveSupabaseProfile(metadata);
+        try {
+          await saveSupabaseProfile(metadata);
+        } catch (profileErr) {
+          console.warn('[TTU Auth] Could not update profile metadata:', profileErr);
+        }
       }
-      const result = await googleSignIn(session.access_token, session.user, savedProfile);
-      sessionStorage.removeItem('ttu_registration_profile');
-      if (!result.success) {
-        setError(result.message || 'Your Google account could not be linked to the TTU portal.');
+
+      try {
+        const result = await googleSignIn(session.access_token, session.user, savedProfile);
+        sessionStorage.removeItem('ttu_registration_profile');
+        if (!result.success) {
+          setError(result.message || 'Your Google account could not be linked to the TTU portal.');
+          handledGoogleSession.current = false;
+          await signOutOfGoogle().catch(() => {});
+        }
+      } catch (signInErr) {
+        console.error('[TTU Auth] Google sign-in failed:', signInErr);
+        setError(signInErr?.message || 'The secure TTU sign-in service is unavailable. Please try again.');
         handledGoogleSession.current = false;
-        signOutOfGoogle().catch(() => {});
+        await signOutOfGoogle().catch(() => {});
+      } finally {
+        setIsSubmitting(false);
       }
-      setIsSubmitting(false);
     };
-    restoreGoogleSession().catch(() => {
-      setError('Could not restore your Google session. Please try again.');
+
+    restoreGoogleSession().catch((err) => {
+      console.error('[TTU Auth] Unexpected session restore error:', err);
+      setError(err?.message || 'Could not restore your Google session. Please try again.');
       signOutOfGoogle().catch(() => {});
+      setIsSubmitting(false);
     });
   }, [googleSignIn, googleVerificationPending]);
 

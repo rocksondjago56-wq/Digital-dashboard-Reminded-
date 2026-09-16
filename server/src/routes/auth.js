@@ -13,9 +13,10 @@ const prisma = new PrismaClient();
  * Generate a JWT token for a user.
  */
 function generateToken(user) {
+  const secret = process.env.JWT_SECRET || 'ttu-dashboard-jwt-fallback-secret-2026';
   return jwt.sign(
     { userId: user.id, email: user.email, role: user.role },
-    process.env.JWT_SECRET,
+    secret,
     { expiresIn: '7d' }
   );
 }
@@ -87,19 +88,35 @@ async function exchangePasswordAccount(accessToken, rawProfile = {}) {
     courses: role === 'lecturer' ? courses : []
   };
 
-  const user = await prisma.user.upsert({
-    where: { email },
-    update: { name, role, isVerified: true, ...registrationFields },
-    create: {
-      name,
-      email,
-      passwordHash: await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 12),
-      role,
-      isVerified: true,
-      ...registrationFields,
-      studentId: role === 'student' ? registrationFields.studentId || null : null
+  if (!process.env.DATABASE_URL) {
+    throw new Error('Database connection is not configured on Render (missing DATABASE_URL). Please configure DATABASE_URL in Render environment settings.');
+  }
+
+  let user;
+  try {
+    user = await prisma.user.upsert({
+      where: { email },
+      update: { name, role, isVerified: true, ...registrationFields },
+      create: {
+        name,
+        email,
+        passwordHash: await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 12),
+        role,
+        isVerified: true,
+        ...registrationFields,
+        studentId: role === 'student' ? registrationFields.studentId || null : null
+      }
+    });
+  } catch (dbError) {
+    console.error('[auth] Prisma user.upsert error during password sign-in:', dbError);
+    if (dbError.code === 'P2002') {
+      const target = dbError.meta?.target || [];
+      const fieldName = Array.isArray(target) ? target.join(', ') : 'field';
+      throw new Error(`An existing account already uses this ${fieldName}.`);
     }
-  });
+    throw dbError;
+  }
+
   const completedDeadlines = (role === 'student' || role === 'student_head')
     ? (await prisma.deadlineCompletion.findMany({ where: { studentId: user.id }, select: { deadlineId: true } }).catch(() => [])).map(item => item.deadlineId)
     : [];
@@ -125,7 +142,23 @@ router.post('/google-signin', async (req, res) => {
   try {
     const { accessToken, profile: rawProfile } = req.body;
     const profile = (rawProfile && typeof rawProfile === 'object') ? rawProfile : {};
-    const rawGoogleUser = await getVerifiedSupabaseUser(accessToken);
+
+    if (!process.env.DATABASE_URL) {
+      console.error('[auth] DATABASE_URL is not set on Render.');
+      return res.status(503).json({
+        error: 'Database connection is not configured on Render (missing DATABASE_URL). Please configure DATABASE_URL in Render environment settings.'
+      });
+    }
+
+    let rawGoogleUser;
+    try {
+      rawGoogleUser = await getVerifiedSupabaseUser(accessToken);
+    } catch (authErr) {
+      return res.status(401).json({
+        error: authErr.message || 'The Supabase authentication session is invalid or has expired. Please sign in again.'
+      });
+    }
+
     const googleUser = (rawGoogleUser?.user || rawGoogleUser);
     const hasGoogleProvider = googleUser?.app_metadata?.providers?.includes('google');
     if (!hasGoogleProvider || !googleUser?.email) {
@@ -170,26 +203,43 @@ router.post('/google-signin', async (req, res) => {
       courses: role === 'lecturer' ? courses : []
     };
 
-    const user = await prisma.user.upsert({
-      where: { email },
-      update: {
-        name,
-        role,
-        profilePictureUrl: profilePictureUrl || undefined,
-        isVerified: true,
-        ...registrationFields
-      },
-      create: {
-        name,
-        email,
-        passwordHash: await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 12),
-        role,
-        ...registrationFields,
-        studentId: role === 'student' ? registrationFields.studentId || `04${Math.floor(10000000 + Math.random() * 90000000)}` : null,
-        profilePictureUrl,
-        isVerified: true
+    let user;
+    try {
+      user = await prisma.user.upsert({
+        where: { email },
+        update: {
+          name,
+          role,
+          profilePictureUrl: profilePictureUrl || undefined,
+          isVerified: true,
+          ...registrationFields
+        },
+        create: {
+          name,
+          email,
+          passwordHash: await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 12),
+          role,
+          ...registrationFields,
+          studentId: role === 'student' ? registrationFields.studentId || `04${Math.floor(10000000 + Math.random() * 90000000)}` : null,
+          profilePictureUrl,
+          isVerified: true
+        }
+      });
+    } catch (dbError) {
+      console.error('[auth] Prisma user.upsert error during Google sign-in:', dbError);
+      if (dbError.code === 'P2002') {
+        const target = dbError.meta?.target || [];
+        const fieldName = Array.isArray(target) ? target.join(', ') : 'field';
+        return res.status(409).json({
+          error: `An existing account already uses this ${fieldName}. Please check your details.`
+        });
       }
-    });
+      return res.status(500).json({
+        error: dbError.message?.includes('DATABASE_URL')
+          ? 'Database connection error: DATABASE_URL is missing or invalid on Render.'
+          : (dbError.message || 'Database error occurred while saving your portal user.')
+      });
+    }
 
     const completedDeadlines = (user.role === 'student' || user.role === 'student_head')
       ? (await prisma.deadlineCompletion.findMany({ where: { studentId: user.id }, select: { deadlineId: true } }).catch(() => [])).map(item => item.deadlineId)

@@ -8,6 +8,7 @@
     "dev": "node --watch src/index.js",
     "start": "node src/index.js",
     "seed": "node src/seed.js",
+    "postinstall": "prisma generate",
     "prisma:generate": "npx prisma generate",
     "prisma:push": "npx prisma db push",
     "prisma:studio": "npx prisma studio"
@@ -20,9 +21,7 @@
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.0.1",
-    "nodemailer": "^7.0.6"
-  },
-  "devDependencies": {
+    "nodemailer": "^7.0.6",
     "prisma": "^6.9.0"
   }
 }
