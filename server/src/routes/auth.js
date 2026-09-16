@@ -45,6 +45,40 @@ function formatUser(user, completedDeadlines = []) {
   };
 }
 
+async function validateAdminAccessCode(accessCode) {
+  const code = String(accessCode || '').trim();
+  if (!code) return false;
+
+  const masterCode = (process.env.ADMIN_ACCESS_CODE || 'TTU-ADMIN-2026').trim();
+  if (code.toUpperCase() === masterCode.toUpperCase()) return true;
+
+  try {
+    const activeCodes = await prisma.registrationCode.findMany({
+      where: {
+        role: 'admin',
+        usedAt: null,
+        revokedAt: null,
+        expiresAt: { gt: new Date() }
+      }
+    });
+
+    for (const item of activeCodes) {
+      const matches = await bcrypt.compare(code, item.codeHash);
+      if (matches) {
+        await prisma.registrationCode.update({
+          where: { id: item.id },
+          data: { usedAt: new Date() }
+        });
+        return true;
+      }
+    }
+  } catch (err) {
+    console.warn('[auth] registrationCode check warning:', err.message);
+  }
+
+  return false;
+}
+
 async function exchangePasswordAccount(accessToken, rawProfile = {}) {
   const profile = (rawProfile && typeof rawProfile === 'object') ? rawProfile : {};
   const rawAuthUser = await getVerifiedSupabaseUser(accessToken);
@@ -64,15 +98,24 @@ async function exchangePasswordAccount(accessToken, rawProfile = {}) {
   // Activate requested role if the profile does not have a role assigned yet
   if (!supabaseProfile.role && requestedRole) {
     if (requestedRole === 'admin') {
-      throw new Error('Administrator accounts must be provisioned by an existing administrator.');
+      const isValid = await validateAdminAccessCode(profile.accessCode);
+      if (!isValid) {
+        throw new Error('A valid Administrator Access Code is required to register an Administrator account.');
+      }
     }
     supabaseProfile = await updateSupabaseProfileRole(supabaseProfile.id, requestedRole);
     supabaseProfile.role = requestedRole;
   }
 
-  const role = supabaseProfile.role || (requestedRole && requestedRole !== 'admin' ? requestedRole : 'student');
+  let role = supabaseProfile.role || (requestedRole && requestedRole !== 'admin' ? requestedRole : 'student');
   if (role === 'admin' && supabaseProfile.role !== 'admin') {
-    throw new Error('Administrator accounts must be provisioned by an existing administrator.');
+    const isValid = await validateAdminAccessCode(profile.accessCode);
+    if (!isValid) {
+      throw new Error('A valid Administrator Access Code is required to access an Administrator account.');
+    }
+    supabaseProfile = await updateSupabaseProfileRole(supabaseProfile.id, 'admin');
+    supabaseProfile.role = 'admin';
+    role = 'admin';
   }
 
   const name = profile.fullName?.trim() || metadata.name || metadata.full_name || email.split('@')[0];
@@ -180,15 +223,24 @@ router.post('/google-signin', async (req, res) => {
 
     if (!supabaseProfile.role && requestedRole) {
       if (requestedRole === 'admin') {
-        return res.status(403).json({ error: 'Administrator accounts must be provisioned by an existing administrator.' });
+        const isValid = await validateAdminAccessCode(profile.accessCode);
+        if (!isValid) {
+          return res.status(403).json({ error: 'A valid Administrator Access Code is required to register an Administrator account.' });
+        }
       }
       supabaseProfile = await updateSupabaseProfileRole(supabaseProfile.id, requestedRole);
       supabaseProfile.role = requestedRole;
     }
 
-    const role = supabaseProfile.role || (requestedRole && requestedRole !== 'admin' ? requestedRole : 'student');
+    let role = supabaseProfile.role || (requestedRole && requestedRole !== 'admin' ? requestedRole : 'student');
     if (role === 'admin' && supabaseProfile.role !== 'admin') {
-      return res.status(403).json({ error: 'Administrator accounts must be provisioned by an existing administrator.' });
+      const isValid = await validateAdminAccessCode(profile.accessCode);
+      if (!isValid) {
+        return res.status(403).json({ error: 'A valid Administrator Access Code is required to access an Administrator account.' });
+      }
+      supabaseProfile = await updateSupabaseProfileRole(supabaseProfile.id, 'admin');
+      supabaseProfile.role = 'admin';
+      role = 'admin';
     }
 
     const courses = Array.isArray(profile.courses) ? profile.courses.filter(Boolean) : (metadata.requested_courses || []);

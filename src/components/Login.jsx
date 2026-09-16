@@ -4,7 +4,7 @@ import './Login.css';
 import ttuLogo from '../ttu-logo.png.png';
 import { getSupabaseSession, saveSupabaseProfile, signInWithEmailPassword, signInWithGoogle, signUpWithEmailPassword, signOutOfGoogle } from '../lib/supabase';
 
-const EMPTY_PROFILE = { role: 'student', fullName: '', indexNumber: '', email: '', password: '', program: '', certificate: 'BTech', year: 'Year 1', lecturerId: '', phone: '', department: 'Graphic Design', courses: [] };
+const EMPTY_PROFILE = { role: 'student', fullName: '', indexNumber: '', email: '', password: '', program: '', certificate: 'BTech', year: 'Year 1', lecturerId: '', phone: '', department: 'Graphic Design', courses: [], position: 'Department Administrator', accessCode: '' };
 
 export default function Login() {
   const { googleSignIn, googleVerificationPending, confirmGoogleVerification, passwordPortalSignIn } = useContext(DbContext);
@@ -104,9 +104,14 @@ export default function Login() {
     setIsSubmitting(true);
     try {
       if (isRegistering) {
-        const required = profile.role === 'student'
-          ? [profile.fullName, profile.indexNumber, profile.email, profile.password, profile.program]
-          : [profile.fullName, profile.email, profile.password, profile.phone, profile.department];
+        let required = [];
+        if (profile.role === 'student') {
+          required = [profile.fullName, profile.indexNumber, profile.email, profile.password, profile.program];
+        } else if (profile.role === 'admin') {
+          required = [profile.fullName, profile.email, profile.password, profile.phone, profile.department, profile.accessCode];
+        } else {
+          required = [profile.fullName, profile.email, profile.password, profile.phone, profile.department];
+        }
         if (required.some(value => !String(value).trim())) throw new Error('Complete all required registration fields.');
         const result = await signUpWithEmailPassword(profile, profile.password);
         if (!result.session?.access_token) {
@@ -137,8 +142,11 @@ export default function Login() {
 
   const handleGoogleSignIn = async () => {
     setError('');
-    setIsSubmitting(true);
     try {
+      if (isRegistering && profile.role === 'admin' && !profile.accessCode?.trim()) {
+        throw new Error('Please enter your Administrator Access Code before continuing with Google.');
+      }
+      setIsSubmitting(true);
       await signInWithGoogle(isRegistering ? profile : null);
     } catch (googleError) {
       setError(googleError.message || 'Google sign-in could not be started.');
@@ -250,5 +258,107 @@ export default function Login() {
 }
 
 function RegistrationFields({ profile, updateProfile }) {
-  return <><div className="form-group"><label>Role</label><select value={profile.role} onChange={event => updateProfile('role', event.target.value)}><option value="student">Student</option><option value="lecturer">Lecturer</option></select></div><div className="form-group"><label>Full Name</label><input value={profile.fullName} onChange={event => updateProfile('fullName', event.target.value)} required /></div><div className="form-group"><label>Email Address</label><input type="email" value={profile.email} onChange={event => updateProfile('email', event.target.value)} autoComplete="email" required /></div><div className="form-group"><label>Password</label><input type="password" value={profile.password} onChange={event => updateProfile('password', event.target.value)} autoComplete="new-password" minLength="6" required /></div>{profile.role === 'student' ? <><div className="form-group"><label>Index Number</label><input value={profile.indexNumber} onChange={event => updateProfile('indexNumber', event.target.value)} required /></div><div className="form-group"><label>Program</label><input value={profile.program} onChange={event => updateProfile('program', event.target.value)} required /></div><div className="student-signup-row"><div className="form-group"><label>Certificate Type</label><select value={profile.certificate} onChange={event => updateProfile('certificate', event.target.value)}><option>BTech</option><option>HND</option><option>Diploma</option></select></div><div className="form-group"><label>Level</label><select value={profile.year} onChange={event => updateProfile('year', event.target.value)}>{['Year 1', 'Year 2', 'Year 3', 'Year 4'].map(year => <option key={year}>{year}</option>)}</select></div></div></> : <><div className="form-group"><label>Lecturer ID <span className="optional-label">(optional)</span></label><input value={profile.lecturerId} onChange={event => updateProfile('lecturerId', event.target.value)} /></div><div className="form-group"><label>Phone Number</label><input type="tel" value={profile.phone} onChange={event => updateProfile('phone', event.target.value)} required /></div><div className="form-group"><label>Department</label><input value={profile.department} onChange={event => updateProfile('department', event.target.value)} required /></div><div className="form-group"><label>Courses Taught <span className="optional-label">(comma-separated)</span></label><input placeholder="e.g. Layout Design II, Vector Graphics I" value={Array.isArray(profile.courses) ? profile.courses.join(', ') : profile.courses || ''} onChange={event => updateProfile('courses', event.target.value.split(',').map(c => c.trim()).filter(Boolean))} /></div></>}</>;
+  return (
+    <>
+      <div className="form-group">
+        <label>Role</label>
+        <select value={profile.role} onChange={event => updateProfile('role', event.target.value)}>
+          <option value="student">Student</option>
+          <option value="lecturer">Lecturer</option>
+          <option value="admin">Administrator</option>
+        </select>
+      </div>
+      <div className="form-group">
+        <label>Full Name</label>
+        <input value={profile.fullName} onChange={event => updateProfile('fullName', event.target.value)} required />
+      </div>
+      <div className="form-group">
+        <label>Email Address</label>
+        <input type="email" value={profile.email} onChange={event => updateProfile('email', event.target.value)} autoComplete="email" required />
+      </div>
+      <div className="form-group">
+        <label>Password</label>
+        <input type="password" value={profile.password} onChange={event => updateProfile('password', event.target.value)} autoComplete="new-password" minLength="6" required />
+      </div>
+
+      {profile.role === 'student' ? (
+        <>
+          <div className="form-group">
+            <label>Index Number</label>
+            <input value={profile.indexNumber} onChange={event => updateProfile('indexNumber', event.target.value)} required />
+          </div>
+          <div className="form-group">
+            <label>Program</label>
+            <input value={profile.program} onChange={event => updateProfile('program', event.target.value)} required />
+          </div>
+          <div className="student-signup-row">
+            <div className="form-group">
+              <label>Certificate Type</label>
+              <select value={profile.certificate} onChange={event => updateProfile('certificate', event.target.value)}>
+                <option>BTech</option>
+                <option>HND</option>
+                <option>Diploma</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Level</label>
+              <select value={profile.year} onChange={event => updateProfile('year', event.target.value)}>
+                {['Year 1', 'Year 2', 'Year 3', 'Year 4'].map(year => <option key={year}>{year}</option>)}
+              </select>
+            </div>
+          </div>
+        </>
+      ) : profile.role === 'admin' ? (
+        <>
+          <div className="form-group">
+            <label>Staff / Employee ID <span className="optional-label">(optional)</span></label>
+            <input placeholder="e.g. ADM-0420" value={profile.lecturerId} onChange={event => updateProfile('lecturerId', event.target.value)} />
+          </div>
+          <div className="form-group">
+            <label>Phone Number</label>
+            <input type="tel" placeholder="e.g. +233 24 123 4567" value={profile.phone} onChange={event => updateProfile('phone', event.target.value)} required />
+          </div>
+          <div className="form-group">
+            <label>Department / Office</label>
+            <input value={profile.department} onChange={event => updateProfile('department', event.target.value)} required />
+          </div>
+          <div className="form-group">
+            <label>Administrative Position</label>
+            <input placeholder="e.g. Department Administrator" value={profile.position} onChange={event => updateProfile('position', event.target.value)} />
+          </div>
+          <div className="form-group admin-access-code-group">
+            <label>Administrator Access Code <span className="required-badge">*</span></label>
+            <input
+              type="password"
+              placeholder="Enter secret administrator access code"
+              value={profile.accessCode}
+              onChange={event => updateProfile('accessCode', event.target.value)}
+              autoComplete="off"
+              required
+            />
+            <small className="field-hint">Required to authorize administrator privileges.</small>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="form-group">
+            <label>Lecturer ID <span className="optional-label">(optional)</span></label>
+            <input value={profile.lecturerId} onChange={event => updateProfile('lecturerId', event.target.value)} />
+          </div>
+          <div className="form-group">
+            <label>Phone Number</label>
+            <input type="tel" value={profile.phone} onChange={event => updateProfile('phone', event.target.value)} required />
+          </div>
+          <div className="form-group">
+            <label>Department</label>
+            <input value={profile.department} onChange={event => updateProfile('department', event.target.value)} required />
+          </div>
+          <div className="form-group">
+            <label>Courses Taught <span className="optional-label">(comma-separated)</span></label>
+            <input placeholder="e.g. Layout Design II, Vector Graphics I" value={Array.isArray(profile.courses) ? profile.courses.join(', ') : profile.courses || ''} onChange={event => updateProfile('courses', event.target.value.split(',').map(c => c.trim()).filter(Boolean))} />
+          </div>
+        </>
+      )}
+    </>
+  );
 }

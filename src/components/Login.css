@@ -288,3 +288,22 @@
     max-width: 200px;
   }
 }
+
+.required-badge {
+  color: #ef4444;
+  font-weight: 700;
+  margin-left: 2px;
+}
+
+.field-hint {
+  display: block;
+  font-size: 0.8rem;
+  color: #64748b;
+  margin-top: 4px;
+}
+
+.admin-access-code-group input {
+  border-color: #94a3b8;
+  background-color: #f8fafc;
+}
+
