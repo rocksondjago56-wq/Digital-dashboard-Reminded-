@@ -91,32 +91,37 @@ async function exchangePasswordAccount(accessToken, rawProfile = {}) {
 
   let supabaseProfile = await ensureSupabaseProfile(accessToken, authUser);
   const metadata = authUser.user_metadata || {};
-  const requestedRole = ['student', 'lecturer', 'admin'].includes(profile.role)
-    ? profile.role
-    : (['student', 'lecturer', 'admin'].includes(metadata.requested_role) ? metadata.requested_role : null);
 
-  // Activate requested role if the profile does not have a role assigned yet
-  if (!supabaseProfile.role && requestedRole) {
-    if (requestedRole === 'admin') {
+  // profileRole is only set when the user explicitly submits a registration form
+  // (profile.role is present). Regular sign-ins pass no profile, so profileRole is null.
+  const profileRole = ['student', 'lecturer', 'admin'].includes(profile.role) ? profile.role : null;
+  const metaRole = ['student', 'lecturer', 'admin'].includes(metadata.requested_role) ? metadata.requested_role : null;
+
+  // During registration (profileRole set): always apply the chosen role, even if
+  // the Supabase profile already has a stale 'student' role from a prior attempt.
+  if (profileRole && profileRole !== supabaseProfile.role) {
+    if (profileRole === 'admin') {
       const isValid = await validateAdminAccessCode(profile.accessCode);
       if (!isValid) {
         throw new Error('A valid Administrator Access Code is required to register an Administrator account.');
       }
     }
-    supabaseProfile = await updateSupabaseProfileRole(supabaseProfile.id, requestedRole);
-    supabaseProfile.role = requestedRole;
+    supabaseProfile = await updateSupabaseProfileRole(supabaseProfile.id, profileRole);
+    supabaseProfile.role = profileRole;
+  } else if (!supabaseProfile.role && metaRole) {
+    // Fallback: first-time Google sign-in where role came from OAuth metadata
+    if (metaRole === 'admin') {
+      const isValid = await validateAdminAccessCode(profile.accessCode);
+      if (!isValid) {
+        throw new Error('A valid Administrator Access Code is required to register an Administrator account.');
+      }
+    }
+    supabaseProfile = await updateSupabaseProfileRole(supabaseProfile.id, metaRole);
+    supabaseProfile.role = metaRole;
   }
 
-  let role = supabaseProfile.role || (requestedRole && requestedRole !== 'admin' ? requestedRole : 'student');
-  if (role === 'admin' && supabaseProfile.role !== 'admin') {
-    const isValid = await validateAdminAccessCode(profile.accessCode);
-    if (!isValid) {
-      throw new Error('A valid Administrator Access Code is required to access an Administrator account.');
-    }
-    supabaseProfile = await updateSupabaseProfileRole(supabaseProfile.id, 'admin');
-    supabaseProfile.role = 'admin';
-    role = 'admin';
-  }
+  // Use the now-updated supabaseProfile role; fall back to 'student' if still unset
+  let role = supabaseProfile.role || 'student';
 
   const name = profile.fullName?.trim() || metadata.name || metadata.full_name || email.split('@')[0];
   const courses = Array.isArray(profile.courses) ? profile.courses.filter(Boolean) : (metadata.requested_courses || []);
@@ -217,31 +222,32 @@ router.post('/google-signin', async (req, res) => {
     const name = profile.fullName?.trim() || metadata.full_name || metadata.name || email.split('@')[0];
     const profilePictureUrl = metadata.avatar_url || metadata.picture || null;
 
-    const requestedRole = ['student', 'lecturer', 'admin'].includes(profile.role)
-      ? profile.role
-      : (['student', 'lecturer', 'admin'].includes(metadata.requested_role) ? metadata.requested_role : null);
+    // profileRole is set only during Google registration (user filled the registration form)
+    const profileRole = ['student', 'lecturer', 'admin'].includes(profile.role) ? profile.role : null;
+    const metaRole = ['student', 'lecturer', 'admin'].includes(metadata.requested_role) ? metadata.requested_role : null;
 
-    if (!supabaseProfile.role && requestedRole) {
-      if (requestedRole === 'admin') {
+    // During registration: always apply the chosen role even if profile already has 'student'
+    if (profileRole && profileRole !== supabaseProfile.role) {
+      if (profileRole === 'admin') {
         const isValid = await validateAdminAccessCode(profile.accessCode);
         if (!isValid) {
           return res.status(403).json({ error: 'A valid Administrator Access Code is required to register an Administrator account.' });
         }
       }
-      supabaseProfile = await updateSupabaseProfileRole(supabaseProfile.id, requestedRole);
-      supabaseProfile.role = requestedRole;
+      supabaseProfile = await updateSupabaseProfileRole(supabaseProfile.id, profileRole);
+      supabaseProfile.role = profileRole;
+    } else if (!supabaseProfile.role && metaRole) {
+      if (metaRole === 'admin') {
+        const isValid = await validateAdminAccessCode(profile.accessCode);
+        if (!isValid) {
+          return res.status(403).json({ error: 'A valid Administrator Access Code is required to register an Administrator account.' });
+        }
+      }
+      supabaseProfile = await updateSupabaseProfileRole(supabaseProfile.id, metaRole);
+      supabaseProfile.role = metaRole;
     }
 
-    let role = supabaseProfile.role || (requestedRole && requestedRole !== 'admin' ? requestedRole : 'student');
-    if (role === 'admin' && supabaseProfile.role !== 'admin') {
-      const isValid = await validateAdminAccessCode(profile.accessCode);
-      if (!isValid) {
-        return res.status(403).json({ error: 'A valid Administrator Access Code is required to access an Administrator account.' });
-      }
-      supabaseProfile = await updateSupabaseProfileRole(supabaseProfile.id, 'admin');
-      supabaseProfile.role = 'admin';
-      role = 'admin';
-    }
+    let role = supabaseProfile.role || 'student';
 
     const courses = Array.isArray(profile.courses) ? profile.courses.filter(Boolean) : (metadata.requested_courses || []);
     const registrationFields = {
