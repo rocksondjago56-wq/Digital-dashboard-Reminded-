@@ -69,35 +69,45 @@
 /* Navigation Tabs */
 .admin-tab-nav {
   display: flex;
-  gap: 12px;
-  border-bottom: 1px solid var(--border-light);
-  padding-bottom: 2px;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(226, 232, 240, 0.85);
+  border-radius: var(--radius-md);
+  padding: 6px 8px;
   overflow-x: auto;
   max-width: 100%;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.05);
 }
 
 .admin-nav-btn {
-  background: none;
+  background: transparent;
   border: none;
   border-bottom: 3px solid transparent;
-  padding: 12px 20px;
-  color: #64748b;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  padding: 10px 18px;
+  color: #475569;
   font-family: var(--font-heading);
-  font-size: 0.95rem;
+  font-size: 0.93rem;
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
-  transition: var(--transition-smooth);
+  transition: all 0.2s ease;
+  position: relative;
 }
 
 .admin-nav-btn:hover {
-  color: #004085;
+  color: #0f172a;
+  background: rgba(241, 245, 249, 0.7);
   border-bottom-color: #cbd5e1;
 }
 
 .admin-nav-btn.active {
-  color: #004085;
-  border-bottom-color: #004085;
+  color: #0f172a;
+  font-weight: 700;
+  border-bottom-color: var(--ttu-gold, #d97706);
+  background: rgba(217, 119, 6, 0.08);
 }
 
 /* Working Panel */
@@ -553,7 +563,8 @@
 }
 
 .admin-nav-btn.active .nav-badge {
-  background: rgba(255, 255, 255, 0.35);
+  background: var(--ttu-gold, #d97706);
+  color: #ffffff;
 }
 
 /* ── Registration Codes Table ───────────────────────────────── */

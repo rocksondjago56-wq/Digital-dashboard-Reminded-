@@ -468,19 +468,19 @@ export default function AdminDashboard() {
           className={`admin-nav-btn ${adminTab === 'announcements' ? 'active' : ''}`} 
           onClick={() => switchAdminTab('announcements')}
         >
-          📢 Manage Announcements
+          Manage Announcements
         </button>
         <button 
           className={`admin-nav-btn ${adminTab === 'events' ? 'active' : ''}`} 
           onClick={() => switchAdminTab('events')}
         >
-          📅 Manage Events
+          Manage Events
         </button>
         <button 
           className={`admin-nav-btn ${adminTab === 'deadlines' ? 'active' : ''}`} 
           onClick={() => switchAdminTab('deadlines')}
         >
-          📝 Manage Deadlines
+          Manage Deadlines
         </button>
         <button
           className={`admin-nav-btn ${adminTab === 'timetable' ? 'active' : ''}`}
@@ -498,7 +498,7 @@ export default function AdminDashboard() {
           className={`admin-nav-btn ${adminTab === 'users' ? 'active' : ''}`} 
           onClick={() => switchAdminTab('users')}
         >
-          👥 User Administration
+          User Administration
           {users.length > 0 && <span className="nav-badge">{users.length}</span>}
         </button>
         <button
