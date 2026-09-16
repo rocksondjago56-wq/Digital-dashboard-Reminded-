@@ -41,6 +41,7 @@ This document provides official access codes, demo login credentials, and regist
 ## 🎓 3. Student & Class Head Accounts
 
 ### Student
+
 | Detail | Value |
 | :--- | :--- |
 | **Role** | `student` |
@@ -51,6 +52,7 @@ This document provides official access codes, demo login credentials, and regist
 | **Access Rights** | View timetables, track deadlines, download project briefs, access department announcements, join WhatsApp groups |
 
 ### Class Representative (Student Head)
+
 | Detail | Value |
 | :--- | :--- |
 | **Role** | `student_head` |
@@ -72,12 +74,12 @@ This document provides official access codes, demo login credentials, and regist
 ## ⚡ Quick Testing Tips
 
 1. **One-Click Demo Fill**:
-   - On the sign-in screen, click **"Sign in with Email & Password"**.
-   - Tap any of the quick demo chips:
-     - `👑 Admin` → Fills `admin@ttu.edu.gh` / `admin123`
-     - `👨‍🏫 Lecturer` → Fills `lecturer@ttu.edu.gh` / `lecturer123`
-     - `🎓 Student` → Fills `student@ttu.edu.gh` / `student123`
-   - Click **Sign In with Email** to immediately enter the corresponding dashboard.
+   * On the sign-in screen, click **"Sign in with Email & Password"**.
+   * Tap any of the quick demo chips:
+     * `👑 Admin` → Fills `admin@ttu.edu.gh` / `admin123`
+     * `👨‍🏫 Lecturer` → Fills `lecturer@ttu.edu.gh` / `lecturer123`
+     * `🎓 Student` → Fills `student@ttu.edu.gh` / `student123`
+   * Click **Sign In with Email** to immediately enter the corresponding dashboard.
 
 2. **Role Management**:
-   - As an Administrator, you can open the **User Administration** tab from the Administrator Dashboard to promote or adjust any registered user's role between Student, Lecturer, and Admin.
+   * As an Administrator, you can open the **User Administration** tab from the Administrator Dashboard to promote or adjust any registered user's role between Student, Lecturer, and Admin.
