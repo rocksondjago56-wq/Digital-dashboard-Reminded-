@@ -29,25 +29,25 @@ enum AnnouncementCategory {
 }
 
 model User {
-  id                String    @id @default(uuid())
-  name              String
-  email             String    @unique
-  passwordHash      String    @map("password_hash")
-  role              UserRole  @default(student)
-  department        String    @default("Graphic Design")
-  year              String?
-  certificate       String?
-  studentId         String?   @unique @map("student_id")
-  staffId           String?   @unique @map("staff_id")
-  phone             String?   @unique @map("phone")
-  designation       String?
-  courses           String[]  @default([])
-  profilePictureUrl String?   @map("profile_picture_url")
-  isVerified        Boolean   @default(false) @map("is_verified")
-  verificationCodeHash String? @map("verification_code_hash")
-  verificationExpiresAt DateTime? @map("verification_expires_at")
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @updatedAt @map("updated_at")
+  id                    String                @id @default(uuid())
+  name                  String
+  email                 String                @unique
+  passwordHash          String                @map("password_hash")
+  role                  UserRole              @default(student)
+  department            String                @default("Graphic Design")
+  year                  String?
+  certificate           String?
+  studentId             String?               @unique @map("student_id")
+  staffId               String?               @unique @map("staff_id")
+  phone                 String?               @unique @map("phone")
+  designation           String?
+  courses               String[]              @default([])
+  profilePictureUrl     String?               @map("profile_picture_url")
+  isVerified            Boolean               @default(false) @map("is_verified")
+  verificationCodeHash  String?               @map("verification_code_hash")
+  verificationExpiresAt DateTime?             @map("verification_expires_at")
+  createdAt             DateTime              @default(now()) @map("created_at")
+  updatedAt             DateTime              @updatedAt @map("updated_at")
 
   // Relations
   deadlines           Deadline[]
@@ -58,13 +58,38 @@ model User {
   @@map("users")
 }
 
+enum SupabaseUserRole {
+  student
+  lecturer
+  admin
+
+  @@map("user_role")
+}
+
+model Profile {
+  id                String            @id @default(uuid()) @db.Uuid
+  name              String
+  email             String            @unique
+  role              SupabaseUserRole?
+  department        String            @default("Graphic Design")
+  year              String?
+  studentId         String?           @unique @map("student_id")
+  courses           String[]          @default([])
+  profilePictureUrl String?           @map("profile_picture_url")
+  createdAt         DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  program           String?
+
+  @@map("profiles")
+}
+
 model Deadline {
   id             String       @id @default(uuid())
   title          String
   description    String
   course         String
-  certificate   String       @default("All Certificates")
-  year          String       @default("All Years")
+  certificate    String       @default("All Certificates")
+  year           String       @default("All Years")
   dueDate        DateTime     @map("due_date") @db.Date
   type           DeadlineType
   authorId       String       @map("author_id")
@@ -80,15 +105,15 @@ model Deadline {
 }
 
 model Announcement {
-  id        String               @id @default(uuid())
-  title     String
-  content   String
-  category  AnnouncementCategory
-  certificate String          @default("All Certificates")
-  year        String          @default("All Years")
-  isPinned  Boolean              @default(false) @map("is_pinned")
-  authorId  String               @map("author_id")
-  createdAt DateTime             @default(now()) @map("created_at")
+  id          String               @id @default(uuid())
+  title       String
+  content     String
+  category    AnnouncementCategory
+  certificate String               @default("All Certificates")
+  year        String               @default("All Years")
+  isPinned    Boolean              @default(false) @map("is_pinned")
+  authorId    String               @map("author_id")
+  createdAt   DateTime             @default(now()) @map("created_at")
 
   // Relations
   author User @relation(fields: [authorId], references: [id], onDelete: Restrict)
@@ -154,16 +179,16 @@ model ClassWhatsAppGroup {
 }
 
 model RegistrationCode {
-  id        String   @id @default(uuid())
-  codeHash  String   @unique @map("code_hash")
+  id        String    @id @default(uuid())
+  codeHash  String    @unique @map("code_hash")
   role      UserRole
-  expiresAt DateTime @map("expires_at")
+  expiresAt DateTime  @map("expires_at")
   usedAt    DateTime? @map("used_at")
-  usedBy    String?  @map("used_by")
+  usedBy    String?   @map("used_by")
   revokedAt DateTime? @map("revoked_at")
-  revokedBy String?  @map("revoked_by")
-  createdBy String   @map("created_by")
-  createdAt DateTime @default(now()) @map("created_at")
+  revokedBy String?   @map("revoked_by")
+  createdBy String    @map("created_by")
+  createdAt DateTime  @default(now()) @map("created_at")
 
   @@map("registration_codes")
 }
