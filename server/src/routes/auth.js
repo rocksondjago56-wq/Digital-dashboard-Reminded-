@@ -101,6 +101,26 @@ async function exchangePasswordAccount(accessToken, rawProfile = {}) {
     try {
       const existingUser = await prisma.user.findUnique({ where: { email } });
       if (existingUser) {
+        if (existingUser.role === 'student') {
+          try {
+            const profiles = await prisma.$queryRaw`
+              SELECT role, designation FROM public.profiles WHERE email = ${email} LIMIT 1
+            `;
+            const dbProfile = profiles?.[0];
+            if (dbProfile?.role && ['admin', 'lecturer'].includes(dbProfile.role)) {
+              console.info('[auth] Elevating role from profiles table to user:', { email, oldRole: existingUser.role, newRole: dbProfile.role });
+              existingUser.role = dbProfile.role;
+              if (dbProfile.designation) existingUser.designation = dbProfile.designation;
+              await prisma.user.update({
+                where: { id: existingUser.id },
+                data: { role: dbProfile.role, designation: existingUser.designation }
+              });
+            }
+          } catch (syncErr) {
+            console.warn('[auth] Profiles table role sync check skipped:', syncErr.message);
+          }
+        }
+
         const completedDeadlines = (['student', 'student_head'].includes(existingUser.role))
           ? (await prisma.deadlineCompletion.findMany({ where: { studentId: existingUser.id }, select: { deadlineId: true } }).catch(() => [])).map(item => item.deadlineId)
           : [];
@@ -239,11 +259,31 @@ router.post('/google-signin', async (req, res) => {
       try {
         const existingUser = await prisma.user.findUnique({ where: { email } });
         if (existingUser) {
-          // Update name/photo in case they changed, but preserve the stored role
+          let roleToApply = existingUser.role;
+          let designationToApply = existingUser.designation;
+          if (existingUser.role === 'student') {
+            try {
+              const profiles = await prisma.$queryRaw`
+                SELECT role, designation FROM public.profiles WHERE email = ${email} LIMIT 1
+              `;
+              const dbProfile = profiles?.[0];
+              if (dbProfile?.role && ['admin', 'lecturer'].includes(dbProfile.role)) {
+                console.info('[auth] Google fast sign-in elevating role from profiles:', { email, oldRole: existingUser.role, newRole: dbProfile.role });
+                roleToApply = dbProfile.role;
+                if (dbProfile.designation) designationToApply = dbProfile.designation;
+              }
+            } catch (syncErr) {
+              console.warn('[auth] Profiles table role sync skipped:', syncErr.message);
+            }
+          }
+
+          // Update name/photo and role if elevated
           const updatedUser = await prisma.user.update({
             where: { email },
             data: {
               name,
+              role: roleToApply,
+              designation: designationToApply,
               profilePictureUrl: profilePictureUrl || existingUser.profilePictureUrl || undefined,
               isVerified: true
             }

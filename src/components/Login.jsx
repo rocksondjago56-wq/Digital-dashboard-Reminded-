@@ -18,7 +18,7 @@ async function sendPasswordReset(email) {
 }
 
 export default function Login() {
-  const { googleSignIn, googleVerificationPending, confirmGoogleVerification, passwordPortalSignIn } = useContext(DbContext);
+  const { login, googleSignIn, googleVerificationPending, confirmGoogleVerification, passwordPortalSignIn } = useContext(DbContext);
   const [isRegistering, setIsRegistering] = useState(false);
   const [showEmailSignIn, setShowEmailSignIn] = useState(false);
   const [profile, setProfile] = useState(EMPTY_PROFILE);
@@ -134,12 +134,33 @@ export default function Login() {
         const portal = await passwordPortalSignIn(result.session.access_token, portalProfile);
         if (!portal.success) throw new Error(portal.message);
       } else {
-        const result = await signInWithEmailPassword(email, password);
-        if (!result.session?.access_token) {
-          throw new Error('Could not establish an authenticated session. Please check your credentials.');
+        let signedIn = false;
+        let lastError = null;
+        try {
+          const result = await signInWithEmailPassword(email, password);
+          if (result?.session?.access_token) {
+            const portal = await passwordPortalSignIn(result.session.access_token);
+            if (portal?.success) {
+              signedIn = true;
+            } else {
+              lastError = new Error(portal?.message || 'Portal sign-in failed.');
+            }
+          }
+        } catch (supabaseErr) {
+          lastError = supabaseErr;
         }
-        const portal = await passwordPortalSignIn(result.session.access_token);
-        if (!portal.success) throw new Error(portal.message);
+
+        // Fallback to database / local login if Supabase auth fails (e.g. system accounts, admin@ttu.edu.gh, etc.)
+        if (!signedIn) {
+          const portalLogin = await login(email, password);
+          if (portalLogin?.success) {
+            signedIn = true;
+          } else if (lastError) {
+            throw lastError;
+          } else {
+            throw new Error(portalLogin?.message || 'Incorrect email or password.');
+          }
+        }
       }
     } catch (submitError) {
       const msg = submitError.message || 'Could not complete sign-in.';
@@ -275,6 +296,41 @@ export default function Login() {
                     Forgot Password?
                   </button>
                 )}
+                <div className="demo-accounts-helper">
+                  <span className="demo-accounts-label">Demo accounts:</span>
+                  <div className="demo-chips">
+                    <button
+                      type="button"
+                      className="demo-chip"
+                      onClick={() => {
+                        setEmail('admin@ttu.edu.gh');
+                        setPassword('admin123');
+                      }}
+                    >
+                      👑 Admin
+                    </button>
+                    <button
+                      type="button"
+                      className="demo-chip"
+                      onClick={() => {
+                        setEmail('lecturer@ttu.edu.gh');
+                        setPassword('lecturer123');
+                      }}
+                    >
+                      👨‍🏫 Lecturer
+                    </button>
+                    <button
+                      type="button"
+                      className="demo-chip"
+                      onClick={() => {
+                        setEmail('student@ttu.edu.gh');
+                        setPassword('student123');
+                      }}
+                    >
+                      🎓 Student
+                    </button>
+                  </div>
+                </div>
               </form>
             ) : (
               <button

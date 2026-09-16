@@ -9,11 +9,12 @@ const router = Router();
 const prisma = new PrismaClient();
 
 function canManageTestRoles(user) {
+  if (user?.role === 'admin') return true;
   const allowedEmails = (process.env.TEST_ROLE_MANAGER_EMAILS || '')
     .split(',')
     .map(email => email.trim().toLowerCase())
     .filter(Boolean);
-  return user?.role === 'admin' && allowedEmails.includes(user.email?.toLowerCase());
+  return allowedEmails.includes(user?.email?.toLowerCase());
 }
 
 /**
@@ -205,6 +206,14 @@ router.put('/:id/role', authenticate, requireAdmin(), async (req, res) => {
       where: { id },
       data: { role }
     });
+
+    if (updated.email) {
+      await prisma.$executeRaw`
+        UPDATE public.profiles SET role = ${role}, updated_at = NOW() WHERE email = ${updated.email}
+      `.catch((err) => {
+        console.warn('[users] profiles table sync warning:', err.message);
+      });
+    }
 
     res.json({
       success: true,
