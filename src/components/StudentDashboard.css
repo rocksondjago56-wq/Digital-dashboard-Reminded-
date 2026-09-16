@@ -85,21 +85,28 @@
   display: flex;
   gap: 8px;
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
   padding-bottom: 4px;
   max-width: 100%;
+}
+
+.tabs-list::-webkit-scrollbar {
+  display: none;
 }
 
 .tab-btn {
   background: #ffffff;
   border: 1px solid #cbd5e1;
   border-radius: 20px;
-  padding: 6px 14px;
+  padding: 8px 16px;
   color: #475569;
   font-family: var(--font-heading);
   font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
+  flex-shrink: 0;
   transition: var(--transition-smooth);
 }
 
@@ -914,6 +921,34 @@
 
   .event-sidebar-card {
     gap: 12px;
+  }
+}
+
+@media (max-width: 360px) {
+  .dashboard-hero {
+    padding: 12px 10px;
+  }
+  
+  .hero-text h1 {
+    font-size: 1.4rem;
+  }
+
+  .hero-stat-card {
+    padding: 10px 6px;
+  }
+
+  .stat-num {
+    font-size: 1.3rem;
+  }
+
+  .dashboard-section,
+  .sidebar-section {
+    padding: 12px 10px;
+  }
+
+  .deadline-card,
+  .announcement-card-item {
+    padding: 12px 10px;
   }
 }
 

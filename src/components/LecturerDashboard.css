@@ -388,6 +388,25 @@
   }
 }
 
+@media (max-width: 360px) {
+  .dashboard-hero {
+    padding: 14px 10px;
+  }
+
+  .form-card {
+    padding: 12px;
+  }
+
+  .lecturer-item-card {
+    padding: 12px;
+  }
+
+  .course-pill {
+    font-size: 0.72rem;
+    padding: 2px 8px;
+  }
+}
+
 /* ── Lecturer Announcement Count Badge ─────────────────────── */
 .lect-ann-badge {
   display: inline-flex;

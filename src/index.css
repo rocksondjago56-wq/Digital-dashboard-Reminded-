@@ -311,7 +311,8 @@ label {
   max-width: 1280px;
   width: 100%;
   margin: 0 auto;
-  padding: 0 24px;
+  padding: 0 clamp(10px, 3vw, 24px);
+  box-sizing: border-box;
 }
 
 .mt-2 { margin-top: 16px; }
@@ -331,7 +332,7 @@ label {
   .desktop-only { display: none; }
 
   .container {
-    padding: 0 12px;
+    padding: 0 clamp(8px, 2.5vw, 16px);
   }
 
   .grid-2,
@@ -341,7 +342,7 @@ label {
   }
 
   input, select, textarea {
-    font-size: 16px;
+    font-size: 16px; /* Prevents auto-zoom on iOS Safari */
   }
 
   label {
@@ -350,10 +351,6 @@ label {
 }
 
 @media (max-width: 480px) {
-  .container {
-    padding: 0 10px;
-  }
-
   .btn {
     min-height: 44px;
     padding: 10px 16px;
@@ -365,6 +362,7 @@ label {
 
   h1, h2, h3, p, span, td, th {
     overflow-wrap: anywhere;
+    word-break: normal;
   }
 
   table {
@@ -375,4 +373,22 @@ label {
   .mb-4 { margin-bottom: 20px; }
   .mt-2 { margin-top: 12px; }
   .mb-2 { margin-bottom: 12px; }
+}
+
+@media (max-width: 360px) {
+  .container {
+    padding: 0 6px;
+  }
+
+  .btn {
+    font-size: 0.85rem;
+    padding: 8px 12px;
+  }
+}
+
+/* Ensure smooth horizontal scroll on touch devices */
+.scroll-touch {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
 }
