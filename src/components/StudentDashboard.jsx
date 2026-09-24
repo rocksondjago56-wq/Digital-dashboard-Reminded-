@@ -3,6 +3,8 @@ import { DbContext } from '../context/DbContextDefinition';
 import './StudentDashboard.css';
 import SubmissionModal from './SubmissionModal';
 import DiscussionThread from './DiscussionThread';
+import AttendanceQRScanner from './AttendanceQRScanner';
+import AttendanceQRGenerator from './AttendanceQRGenerator';
 import {
   openWhatsApp,
   formatAnnouncementForWhatsApp,
@@ -63,6 +65,8 @@ export default function StudentDashboard() {
   const [classHeadPhone, setClassHeadPhone] = useState('');
   const [classInviteLink, setClassInviteLink] = useState('');
   const [classGroupStatus, setClassGroupStatus] = useState('');
+  const [showQRScanner, setShowQRScanner] = useState(false);
+  const [showHeadAttendance, setShowHeadAttendance] = useState(false);
 
   const canManageTimetable = currentUser.role === 'student_head';
   const canManageClassGroup = currentUser.role === 'student_head';
@@ -289,6 +293,35 @@ export default function StudentDashboard() {
           </div>
         </div>
       </header>
+
+      {/* Attendance & Quick Action Bar */}
+      <div className="student-actions-bar mt-3">
+        <button
+          type="button"
+          onClick={() => setShowQRScanner(true)}
+          className="btn btn-primary student-scan-btn"
+          id="btn-scan-attendance"
+        >
+          📷 Scan Attendance QR
+        </button>
+
+        {canManageTimetable && (
+          <button
+            type="button"
+            onClick={() => setShowHeadAttendance(!showHeadAttendance)}
+            className={`btn ${showHeadAttendance ? 'btn-secondary' : 'btn-accent'}`}
+            id="btn-generate-class-attendance"
+          >
+            {showHeadAttendance ? '✕ Close Class Attendance' : '📲 Generate Class Attendance'}
+          </button>
+        )}
+      </div>
+
+      {canManageTimetable && showHeadAttendance && (
+        <div className="mt-3">
+          <AttendanceQRGenerator />
+        </div>
+      )}
 
       {/* Main Grid */}
       <div className="grid-main-sidebar mt-4">
@@ -846,6 +879,11 @@ export default function StudentDashboard() {
           onSubmit={submitAssignment}
           onClose={() => setSubmittingDeadline(null)}
         />
+      )}
+
+      {/* QR Attendance Scanner Modal */}
+      {showQRScanner && (
+        <AttendanceQRScanner onClose={() => setShowQRScanner(false)} />
       )}
     </div>
   );

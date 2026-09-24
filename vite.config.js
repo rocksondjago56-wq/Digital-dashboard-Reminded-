@@ -12,6 +12,8 @@ export default defineConfig({
         // Split the heavy xlsx library into its own lazy chunk
         manualChunks(id) {
           if (id.includes('node_modules/xlsx')) return 'xlsx';
+          if (id.includes('node_modules/qrcode')) return 'qrcode';
+          if (id.includes('node_modules/html5-qrcode')) return 'html5-qrcode';
           if (id.includes('node_modules/react-dom')) return 'react-dom';
           if (id.includes('node_modules/react')) return 'react-vendor';
         }

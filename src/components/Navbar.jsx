@@ -9,6 +9,7 @@ import CalendarView from './CalendarView';
 import ProfileSettingsModal from './ProfileSettingsModal';
 import GpaCalculatorModal from './GpaCalculatorModal';
 import LabBookingModal from './LabBookingModal';
+import AttendanceQRScanner from './AttendanceQRScanner';
 
 export default function Navbar() {
   const {
@@ -39,6 +40,7 @@ export default function Navbar() {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showGpaModal, setShowGpaModal] = useState(false);
   const [showLabModal, setShowLabModal] = useState(false);
+  const [showAttendanceModal, setShowAttendanceModal] = useState(false);
 
   const dropdownRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -212,6 +214,18 @@ export default function Navbar() {
             title="Calculate projected semester GPA and classification"
           >
             <span>🧮</span> <span className="desktop-only">GPA Calc</span>
+          </button>
+        )}
+
+        {/* Attendance Scanner Button (for students) */}
+        {isStudent && (
+          <button
+            type="button"
+            className="navbar-text-btn attendance-btn"
+            onClick={() => setShowAttendanceModal(true)}
+            title="Scan class attendance QR code"
+          >
+            <span>📷</span> <span className="desktop-only">Attendance</span>
           </button>
         )}
 
@@ -393,6 +407,13 @@ export default function Navbar() {
       {showLabModal && (
         <LabBookingModal
           onClose={() => setShowLabModal(false)}
+        />
+      )}
+
+      {/* Attendance Scanner Modal */}
+      {showAttendanceModal && (
+        <AttendanceQRScanner
+          onClose={() => setShowAttendanceModal(false)}
         />
       )}
 

@@ -3,6 +3,7 @@ import { DbContext } from '../context/DbContextDefinition';
 import './LecturerDashboard.css';
 import LecturerSubmissionsModal from './LecturerSubmissionsModal';
 import DiscussionThread from './DiscussionThread';
+import AttendanceQRGenerator from './AttendanceQRGenerator';
 import {
   openWhatsApp,
   formatAnnouncementForWhatsApp,
@@ -38,6 +39,7 @@ export default function LecturerDashboard() {
   // Forms State
   const [showDeadlineForm, setShowDeadlineForm] = useState(false);
   const [showAnnounceForm, setShowAnnounceForm] = useState(false);
+  const [showAttendance, setShowAttendance] = useState(false);
   const [selectedDeadlineForSubmissions, setSelectedDeadlineForSubmissions] = useState(null);
 
   // Deadline Fields
@@ -183,6 +185,9 @@ export default function LecturerDashboard() {
           </div>
         </div>
         <div className="hero-actions">
+          <button onClick={() => setShowAttendance(!showAttendance)} className={`btn ${showAttendance ? 'btn-secondary' : 'btn-accent'}`}>
+            {showAttendance ? '✕ Close Attendance' : '📲 Take Attendance'}
+          </button>
           <button onClick={() => setShowDeadlineForm(!showDeadlineForm)} className="btn btn-primary">
             {showDeadlineForm ? 'Close Deadline Form' : 'Upload Course Deadline'}
           </button>
@@ -200,6 +205,9 @@ export default function LecturerDashboard() {
 
       {/* Forms Drawer */}
       <div className="lecturer-forms-row mt-2">
+        {showAttendance && (
+          <AttendanceQRGenerator />
+        )}
         {showDeadlineForm && (
           <div className="glass-panel form-card animate-fade-in">
             <h2>Upload Course Deadline & Assignment Brief</h2>

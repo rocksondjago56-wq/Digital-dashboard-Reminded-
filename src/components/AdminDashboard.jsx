@@ -158,6 +158,37 @@ export default function AdminDashboard() {
     XLSX.writeFile(wb, 'TTU_Graphic_Design_Submissions_Report.xlsx');
   };
 
+  const handleExportAttendanceExcel = () => {
+    let records = [];
+    try {
+      records = JSON.parse(localStorage.getItem('ttu_attendance_records') || '[]');
+    } catch {
+      records = [];
+    }
+    if (!records.length) {
+      alert('No attendance check-in records found to export.');
+      return;
+    }
+    const rows = records.map((r, idx) => ({
+      'No.': idx + 1,
+      'Course': r.course,
+      'Session Title': r.sessionTitle,
+      'Venue': r.venue || 'N/A',
+      'Lecturer': r.lecturerName || 'N/A',
+      'Student Name': r.studentName,
+      'Student ID / Index': r.studentIndex || r.studentId || 'N/A',
+      'Year Group': r.studentYear || 'N/A',
+      'Programme': r.studentCertificate || 'N/A',
+      'Check-in Date': new Date(r.checkedInAt).toLocaleDateString('en-GH'),
+      'Check-in Time': new Date(r.checkedInAt).toLocaleTimeString('en-GH')
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Attendance');
+    XLSX.writeFile(wb, 'TTU_Graphic_Design_Attendance_Report.xlsx');
+  };
+
   // Form toggles
   const [showForm, setShowForm] = useState(false);
   const [editingTimetableId, setEditingTimetableId] = useState(null);
@@ -1157,6 +1188,14 @@ export default function AdminDashboard() {
                 style={{ background: 'rgba(234, 179, 8, 0.15)', color: '#854d0e', border: '1px solid rgba(234, 179, 8, 0.3)' }}
               >
                 📊 Export All Submissions (.xlsx)
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={handleExportAttendanceExcel}
+                style={{ background: 'rgba(147, 51, 234, 0.15)', color: '#7c3aed', border: '1px solid rgba(147, 51, 234, 0.3)' }}
+              >
+                📊 Export Attendance (.xlsx)
               </button>
             </div>
             <p className="admin-form-status">Demo Mode Enabled. Remove before production deployment.</p>

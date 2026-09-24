@@ -108,6 +108,22 @@
   border-color: rgba(234, 179, 8, 0.5);
 }
 
+.navbar-text-btn.attendance-btn {
+  background: rgba(16, 185, 129, 0.1);
+  border-color: rgba(16, 185, 129, 0.35);
+  color: #047857;
+}
+
+[data-theme="dark"] .navbar-text-btn.attendance-btn {
+  color: #34d399;
+  border-color: rgba(52, 211, 153, 0.4);
+}
+
+.navbar-text-btn.attendance-btn:hover {
+  background: rgba(16, 185, 129, 0.2);
+  border-color: rgba(16, 185, 129, 0.5);
+}
+
 .navbar-right {
   display: flex;
   align-items: center;
