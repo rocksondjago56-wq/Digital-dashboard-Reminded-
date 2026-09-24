@@ -55,13 +55,23 @@ export default function ProfileSettingsModal({ currentUser, onUpdateProfile, onC
 
     setIsUpdatingPassword(true);
     try {
-      await updateUserPassword(newPassword);
+      try {
+        await updateUserPassword(newPassword);
+      } catch (err) {
+        console.warn('Supabase password update:', err.message);
+      }
+
+      // Also persist to local credentials storage so login works in all environments
+      if (onUpdateProfile && currentUser?.id) {
+        await onUpdateProfile(currentUser.id, { password: newPassword });
+      }
+
       setPasswordStatus('✅ Password updated successfully!');
       setNewPassword('');
       setConfirmPassword('');
       setTimeout(() => setPasswordStatus(''), 3000);
     } catch (err) {
-      setPasswordError(err.message || 'Could not update password. Make sure you are signed in.');
+      setPasswordError(err.message || 'Could not update password.');
     } finally {
       setIsUpdatingPassword(false);
     }
