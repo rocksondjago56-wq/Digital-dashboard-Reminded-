@@ -1,0 +1,298 @@
+/* ─── Lab Booking Modal ─────────────────────────────────────────────────── */
+
+.lab-booking-modal {
+  position: relative;
+  width: min(780px, 96vw);
+  max-height: 90vh;
+  overflow-y: auto;
+  border-radius: 20px;
+  padding: 28px 32px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 179, 0, 0.3) transparent;
+}
+
+.lab-booking-modal::-webkit-scrollbar { width: 6px; }
+.lab-booking-modal::-webkit-scrollbar-thumb { background: rgba(255,179,0,0.3); border-radius: 3px; }
+
+/* Header */
+.lab-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.lab-modal-title {
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.lab-modal-subtitle {
+  font-size: 0.85rem;
+  opacity: 0.6;
+  margin: 4px 0 0;
+}
+
+.modal-close-btn {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.12);
+  color: inherit;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  font-size: 1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+.modal-close-btn:hover { background: rgba(255,0,0,0.2); }
+
+/* Tabs */
+.lab-tabs {
+  display: flex;
+  gap: 8px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 12px;
+  padding: 4px;
+}
+
+.lab-tab {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: inherit;
+  padding: 10px 16px;
+  border-radius: 9px;
+  font-size: 0.88rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.lab-tab:hover { background: rgba(255,255,255,0.07); }
+.lab-tab.active { background: var(--color-gold, #ffb300); color: #1a1a2e; font-weight: 700; }
+
+.tab-badge {
+  background: rgba(0,0,0,0.25);
+  border-radius: 12px;
+  padding: 1px 7px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+/* Section Labels */
+.lab-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.lab-section-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  opacity: 0.6;
+}
+
+/* Lab Cards */
+.lab-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 600px) {
+  .lab-grid { grid-template-columns: 1fr; }
+}
+
+.lab-card {
+  background: rgba(255,255,255,0.04);
+  border: 2px solid rgba(255,255,255,0.08);
+  border-radius: 14px;
+  padding: 16px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s, transform 0.15s;
+  text-align: left;
+  color: inherit;
+}
+
+.lab-card:hover {
+  border-color: var(--lab-color, #4f46e5);
+  background: rgba(255,255,255,0.07);
+  transform: translateY(-2px);
+}
+
+.lab-card.selected {
+  border-color: var(--lab-color, #4f46e5);
+  background: color-mix(in srgb, var(--lab-color, #4f46e5) 15%, transparent);
+  box-shadow: 0 0 0 1px var(--lab-color, #4f46e5), 0 4px 20px rgba(0,0,0,0.2);
+}
+
+.lab-card-icon { font-size: 1.8rem; }
+.lab-card-name { font-size: 0.88rem; font-weight: 700; }
+.lab-card-desc { font-size: 0.75rem; opacity: 0.6; line-height: 1.4; }
+.lab-capacity { font-size: 0.72rem; opacity: 0.5; margin-top: 2px; }
+
+/* Day Selector */
+.day-selector {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.day-btn {
+  flex: 1;
+  min-width: 60px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px;
+  padding: 10px 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: inherit;
+}
+
+.day-btn:hover { border-color: rgba(255,179,0,0.4); background: rgba(255,179,0,0.07); }
+.day-btn.active { background: rgba(255,179,0,0.15); border-color: #ffb300; color: #ffb300; }
+
+.day-name { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+.day-date { font-size: 0.7rem; opacity: 0.6; }
+
+/* Slot Grid */
+.slot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 8px;
+}
+
+.slot-btn {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: inherit;
+  text-align: left;
+}
+
+.slot-btn:hover:not(:disabled) { border-color: rgba(255,179,0,0.5); background: rgba(255,179,0,0.07); }
+.slot-btn.selected { border-color: #ffb300; background: rgba(255,179,0,0.15); }
+.slot-btn.taken { opacity: 0.45; cursor: not-allowed; }
+.slot-btn.mine { border-color: #22c55e; background: rgba(34,197,94,0.1); }
+
+.slot-time { font-size: 0.82rem; font-weight: 600; }
+
+.slot-tag { font-size: 0.65rem; font-weight: 700; padding: 2px 8px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.5px; }
+.open-tag { background: rgba(34,197,94,0.15); color: #22c55e; }
+.taken-tag { background: rgba(239,68,68,0.15); color: #ef4444; }
+.mine-tag { background: rgba(34,197,94,0.25); color: #22c55e; }
+
+/* Purpose Input */
+.lab-input {
+  width: 100%;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 10px;
+  padding: 12px 14px;
+  color: inherit;
+  font-size: 0.9rem;
+  font-family: inherit;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+.lab-input::placeholder { opacity: 0.4; }
+.lab-input:focus { outline: none; border-color: #ffb300; }
+
+/* Messages */
+.lab-error {
+  padding: 10px 14px;
+  background: rgba(239,68,68,0.12);
+  border: 1px solid rgba(239,68,68,0.3);
+  border-radius: 8px;
+  color: #ef4444;
+  font-size: 0.85rem;
+}
+
+.lab-success {
+  padding: 10px 14px;
+  background: rgba(34,197,94,0.12);
+  border: 1px solid rgba(34,197,94,0.3);
+  border-radius: 8px;
+  color: #22c55e;
+  font-size: 0.85rem;
+}
+
+/* Book Button */
+.lab-book-btn {
+  width: 100%;
+  padding: 14px;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+/* My Bookings */
+.lab-mine-panel { display: flex; flex-direction: column; gap: 12px; min-height: 200px; }
+
+.lab-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 40px;
+  opacity: 0.7;
+  text-align: center;
+}
+.lab-empty-icon { font-size: 2.5rem; }
+
+.my-bookings-list { display: flex; flex-direction: column; gap: 10px; }
+
+.my-booking-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border-left: 3px solid var(--lab-color, #4f46e5);
+}
+
+.my-booking-icon { font-size: 1.6rem; flex-shrink: 0; }
+
+.my-booking-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 0.85rem;
+}
+.my-booking-info strong { font-size: 0.92rem; }
+.booking-purpose { opacity: 0.55; font-style: italic; }
+
+.cancel-booking-btn { flex-shrink: 0; }
+
+.btn-sm { padding: 6px 14px; font-size: 0.8rem; }

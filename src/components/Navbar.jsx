@@ -1,5 +1,6 @@
 import React, { useContext, useState, useRef, useEffect } from 'react';
 import { DbContext } from '../context/DbContextDefinition';
+import { useTheme } from '../context/ThemeContext';
 import './Navbar.css';
 import ttuLogo from '../ttu-logo.png.png';
 import { openWhatsApp, getWhatsAppConfig } from '../utils/whatsapp';
@@ -7,6 +8,7 @@ import GlobalSearchModal from './GlobalSearchModal';
 import CalendarView from './CalendarView';
 import ProfileSettingsModal from './ProfileSettingsModal';
 import GpaCalculatorModal from './GpaCalculatorModal';
+import LabBookingModal from './LabBookingModal';
 
 export default function Navbar() {
   const {
@@ -23,6 +25,8 @@ export default function Navbar() {
     timetable
   } = useContext(DbContext);
 
+  const { theme, toggleTheme } = useTheme();
+
   const [showNotifications, setShowNotifications] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeletingSelf, setIsDeletingSelf] = useState(false);
@@ -34,6 +38,7 @@ export default function Navbar() {
   const [showCalendarModal, setShowCalendarModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showGpaModal, setShowGpaModal] = useState(false);
+  const [showLabModal, setShowLabModal] = useState(false);
 
   const dropdownRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -210,6 +215,27 @@ export default function Navbar() {
           </button>
         )}
 
+        {/* Lab Booking Button */}
+        <button
+          type="button"
+          className="navbar-text-btn"
+          onClick={() => setShowLabModal(true)}
+          title="Book a studio or lab slot"
+        >
+          <span>🏛️</span> <span className="desktop-only">Labs</span>
+        </button>
+
+        {/* Dark / Light Mode Toggle */}
+        <button
+          type="button"
+          className="navbar-icon-btn theme-toggle-btn"
+          onClick={toggleTheme}
+          title={theme === 'dark' ? 'Switch to TTU Light Mode ☀️' : 'Switch to Studio Dark Mode 🌙'}
+          aria-label="Toggle dark/light mode"
+        >
+          <span>{theme === 'dark' ? '☀️' : '🌙'}</span>
+        </button>
+
         <input 
           type="file" 
           ref={fileInputRef} 
@@ -360,6 +386,13 @@ export default function Navbar() {
       {showGpaModal && (
         <GpaCalculatorModal
           onClose={() => setShowGpaModal(false)}
+        />
+      )}
+
+      {/* Lab Booking Modal */}
+      {showLabModal && (
+        <LabBookingModal
+          onClose={() => setShowLabModal(false)}
         />
       )}
 

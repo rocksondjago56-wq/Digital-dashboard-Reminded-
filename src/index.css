@@ -1,34 +1,18 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
 
+/* ── Shared tokens (always available) ───────────────────────── */
 :root {
-  /* Design Tokens */
   --font-heading: 'Outfit', sans-serif;
   --font-body: 'Plus Jakarta Sans', sans-serif;
 
-  /* Color Palette (Vibrant TTU Blue & Clean White Theme) */
-  --bg-dark: #f0f4f9;               /* Light slate-blue tinted background */
-  --bg-card: #ffffff;                /* Pure crisp white cards */
-  --bg-card-hover: #f8fafc;          /* Soft slate hover background */
-  
-  --ttu-blue: #004085;               /* TTU Royal Blue */
-  --ttu-blue-glow: rgba(0, 64, 133, 0.12);
-  --ttu-blue-light: #0284c7;         /* Bright accent blue */
-  --ttu-blue-vibrant: #1d4ed8;       /* Interactive primary blue */
-  
-  --ttu-gold: #d97706;               /* Rich Amber Gold accent */
-  --ttu-gold-glow: rgba(217, 119, 6, 0.15);
-  --ttu-gold-light: #b45309;
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 24px;
 
-  --accent-cyan: #0284c7;
-  --accent-purple: #6d28d9;
-  
-  --text-primary: #0f172a;           /* Dark navy slate for text (high contrast readability) */
-  --text-secondary: #334155;         /* Slate text */
-  --text-muted: #64748b;             /* Soft slate muted text */
-  
-  --border-light: #e2e8f0;           /* Clean light border */
-  --border-focus: #2563eb;           /* Focus border color */
-  
+  --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --color-gold: #ffb300;
+
+  /* Semantic colour aliases — overridden per theme below */
   --success: #10b981;
   --success-glow: rgba(16, 185, 129, 0.15);
   --warning: #f59e0b;
@@ -37,17 +21,79 @@
   --danger-glow: rgba(239, 68, 68, 0.15);
   --info: #0284c7;
   --info-glow: rgba(2, 132, 199, 0.15);
+}
+
+/* ── ☀️ TTU ROYAL LIGHT MODE (default) ─────────────────────── */
+:root,
+[data-theme="light"] {
+  --bg-dark: #f0f4f9;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f8fafc;
+  --bg-input: #ffffff;
+
+  --ttu-blue: #004085;
+  --ttu-blue-glow: rgba(0, 64, 133, 0.12);
+  --ttu-blue-light: #0284c7;
+  --ttu-blue-vibrant: #1d4ed8;
+
+  --ttu-gold: #d97706;
+  --ttu-gold-glow: rgba(217, 119, 6, 0.15);
+  --ttu-gold-light: #b45309;
+
+  --accent-cyan: #0284c7;
+  --accent-purple: #6d28d9;
+
+  --text-primary: #0f172a;
+  --text-secondary: #334155;
+  --text-muted: #64748b;
+
+  --border-light: #e2e8f0;
+  --border-focus: #2563eb;
 
   --shadow-lg: 0 10px 30px -5px rgba(0, 51, 102, 0.08), 0 4px 12px -2px rgba(0, 0, 0, 0.04);
   --shadow-glow: 0 4px 14px rgba(0, 64, 133, 0.2);
   --shadow-gold-glow: 0 4px 14px rgba(217, 119, 6, 0.2);
-  
-  --radius-sm: 8px;
-  --radius-md: 14px;
-  --radius-lg: 24px;
-  
-  --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+  --glass-bg: rgba(255, 255, 255, 0.85);
+  --glass-border: rgba(226, 232, 240, 1);
+  --scrollbar-thumb: #cbd5e1;
 }
+
+/* ── 🌙 STUDIO CHARCOAL DARK MODE ───────────────────────────── */
+[data-theme="dark"] {
+  --bg-dark: #0e1117;
+  --bg-card: rgba(22, 27, 42, 0.85);
+  --bg-card-hover: rgba(30, 36, 54, 0.9);
+  --bg-input: rgba(255, 255, 255, 0.06);
+
+  --ttu-blue: #3b82f6;
+  --ttu-blue-glow: rgba(59, 130, 246, 0.18);
+  --ttu-blue-light: #60a5fa;
+  --ttu-blue-vibrant: #3b82f6;
+
+  --ttu-gold: #ffb300;
+  --ttu-gold-glow: rgba(255, 179, 0, 0.2);
+  --ttu-gold-light: #ffd54f;
+
+  --accent-cyan: #22d3ee;
+  --accent-purple: #a78bfa;
+
+  --text-primary: #f0f4ff;
+  --text-secondary: #c4cde8;
+  --text-muted: #7b8db0;
+
+  --border-light: rgba(255, 255, 255, 0.1);
+  --border-focus: #60a5fa;
+
+  --shadow-lg: 0 10px 30px -5px rgba(0, 0, 0, 0.5), 0 4px 12px -2px rgba(0, 0, 0, 0.35);
+  --shadow-glow: 0 4px 14px rgba(59, 130, 246, 0.25);
+  --shadow-gold-glow: 0 4px 14px rgba(255, 179, 0, 0.25);
+
+  --glass-bg: rgba(22, 27, 42, 0.75);
+  --glass-border: rgba(255, 255, 255, 0.09);
+  --scrollbar-thumb: rgba(255, 255, 255, 0.15);
+}
+
 
 /* Global Resets */
 *, *::before, *::after {
@@ -71,6 +117,14 @@ body {
   background-position: center;
   background-repeat: no-repeat;
   background-attachment: fixed;
+  transition: background-color 0.4s ease, color 0.4s ease;
+}
+
+/* Dark mode uses a deeper overlay on the same background */
+[data-theme="dark"] body {
+  background-image:
+    linear-gradient(rgba(5, 8, 20, 0.72), rgba(5, 8, 20, 0.8)),
+    url('./IMG_6849-background-rotated.jpg');
 }
 
 img, video, canvas, svg {
@@ -93,7 +147,7 @@ img, video, canvas, svg {
   background: var(--bg-dark);
 }
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: var(--scrollbar-thumb, #cbd5e1);
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
@@ -105,16 +159,16 @@ h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-heading);
   font-weight: 600;
   letter-spacing: -0.02em;
-  color: #0f172a;
+  color: var(--text-primary);
 }
 
 a {
-  color: #003b7a;
+  color: var(--ttu-blue);
   text-decoration: none;
   transition: var(--transition-smooth);
 }
 a:hover {
-  color: #001f4d;
+  color: var(--ttu-blue-light);
 }
 
 /* Glassmorphism / Clean Cards */
@@ -129,18 +183,18 @@ a:hover {
 }
 
 .glass-panel:hover {
-  border-color: #cbd5e1;
-  box-shadow: 0 14px 32px -8px rgba(0, 51, 102, 0.18), 0 0 0 3px rgba(2, 132, 199, 0.08);
+  border-color: var(--border-light);
+  box-shadow: var(--shadow-lg);
 }
 
 /* Forms & Inputs */
 input, select, textarea {
   width: 100%;
   padding: 12px 16px;
-  background: #ffffff;
-  border: 1px solid #cbd5e1;
+  background: var(--bg-input, #ffffff);
+  border: 1px solid var(--border-light);
   border-radius: var(--radius-sm);
-  color: #0f172a;
+  color: var(--text-primary);
   font-family: var(--font-body);
   font-size: 0.95rem;
   transition: var(--transition-smooth);
@@ -150,7 +204,7 @@ input:focus, select:focus, textarea:focus {
   outline: none;
   border-color: var(--border-focus);
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
-  background: #ffffff;
+  background: var(--bg-input, #ffffff);
 }
 
 label {

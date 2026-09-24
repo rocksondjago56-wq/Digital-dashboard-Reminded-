@@ -7,9 +7,10 @@
   border-radius: var(--radius-md);
   position: relative;
   z-index: 100;
-  background: #ffffff;
+  background: var(--bg-card);
   border: 1px solid var(--border-light);
-  box-shadow: 0 4px 20px rgba(0, 51, 102, 0.06);
+  box-shadow: var(--shadow-lg);
+  transition: background 0.4s ease, border-color 0.4s ease;
 }
 
 .navbar-logo {
@@ -33,7 +34,7 @@
   font-family: var(--font-heading);
   font-size: 0.95rem;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--text-primary);
   letter-spacing: 0.02em;
   border-left: 1px solid var(--border-light);
   padding-left: 12px;
@@ -78,21 +79,21 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: #f1f5f9;
-  border: 1px solid #e2e8f0;
+  background: var(--bg-card-hover);
+  border: 1px solid var(--border-light);
   border-radius: 8px;
   padding: 8px 12px;
   font-size: 0.85rem;
   font-weight: 600;
-  color: #334155;
+  color: var(--text-secondary);
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .navbar-text-btn:hover {
-  background: #e2e8f0;
-  border-color: #cbd5e1;
-  color: #0f172a;
+  background: var(--bg-card-hover);
+  border-color: var(--border-light);
+  color: var(--text-primary);
   transform: translateY(-1px);
 }
 
@@ -207,7 +208,7 @@
 .user-name {
   font-size: 0.9rem;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--text-primary);
 }
 
 .user-role {
@@ -245,7 +246,7 @@
 }
 
 .navbar-icon-btn {
-  background: #f1f5f9;
+  background: var(--bg-card-hover);
   border: 1px solid var(--border-light);
   border-radius: var(--radius-sm);
   width: 42px;
@@ -256,12 +257,25 @@
   cursor: pointer;
   position: relative;
   transition: var(--transition-smooth);
+  color: var(--text-secondary);
 }
 
 .navbar-icon-btn:hover {
-  background: #e2e8f0;
-  border-color: #cbd5e1;
+  background: var(--bg-card-hover);
+  border-color: var(--ttu-blue);
   transform: scale(1.05);
+  color: var(--text-primary);
+}
+
+/* Theme Toggle special animation */
+.theme-toggle-btn {
+  font-size: 1.1rem;
+  background: linear-gradient(135deg, rgba(255,179,0,0.12), rgba(59,130,246,0.12));
+  border-color: rgba(255,179,0,0.3);
+}
+.theme-toggle-btn:hover {
+  background: linear-gradient(135deg, rgba(255,179,0,0.25), rgba(59,130,246,0.2));
+  transform: scale(1.1) rotate(12deg);
 }
 
 .bell-emoji {
