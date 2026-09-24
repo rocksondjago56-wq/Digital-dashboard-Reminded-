@@ -148,6 +148,68 @@ const initialTimetable = [
   { id: 'tt5', day: 'Friday', time: '02:00 PM - 04:00 PM', course: 'Design Workshop Seminar', room: 'Auditorium', year: 'All Years' }
 ];
 
+const initialSubmissions = [
+  {
+    id: 'sub_1',
+    deadlineId: 'd1',
+    studentId: '3',
+    studentName: 'Emmanuel Rockson',
+    studentIndex: '0420210088',
+    studentYear: 'Year 3',
+    studentCertificate: 'BTech',
+    file: {
+      name: 'Rockson_Magazine_Layout_Project.pdf',
+      type: 'application/pdf',
+      size: '2.4 MB',
+      dataUrl: 'data:text/plain;charset=utf-8,TTU%20Graphic%20Design%20-%20Student%20Layout%20Submission'
+    },
+    link: 'https://behance.net/gallery/12345/TTU-Magazine-Layout',
+    notes: 'Completed 16-page magazine layout with 3mm bleed and modular 12-column grid. Front and back covers included.',
+    submittedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+    isLate: false,
+    grade: 'A',
+    feedback: 'Excellent typography hierarchy and clean grid structure. Print bleed marks and pagination are spot on.',
+    gradedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+    gradedBy: 'Prof. Andrews K. Mensah'
+  }
+];
+
+const initialComments = [
+  {
+    id: 'comm_1',
+    parentId: 'd1',
+    parentType: 'deadline',
+    authorId: '3',
+    authorName: 'Emmanuel Rockson',
+    authorRole: 'student',
+    authorAvatar: '',
+    text: 'Prof, should the front and back cover count as part of the 16 pages, or in addition to them?',
+    createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'comm_2',
+    parentId: 'd1',
+    parentType: 'deadline',
+    authorId: '2',
+    authorName: 'Prof. Andrews K. Mensah',
+    authorRole: 'lecturer',
+    authorAvatar: '',
+    text: 'Good question Emmanuel. The 16 pages include both the front and back covers.',
+    createdAt: new Date(Date.now() - 2.8 * 24 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'comm_3',
+    parentId: 'a1',
+    parentType: 'announcement',
+    authorId: '4',
+    authorName: 'Class Representative',
+    authorRole: 'student_head',
+    authorAvatar: '',
+    text: 'Please remind everyone to carry their student ID cards when collecting studio cards from the HOD office.',
+    createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString()
+  }
+];
+
 // ─── localStorage Keys ──────────────────────────────────────────────────────
 
 const USERS_STORAGE_KEY = 'ttu_users';
@@ -155,6 +217,8 @@ const CURRENT_USER_STORAGE_KEY = 'ttu_current_user';
 const TIMETABLE_STORAGE_KEY = 'ttu_timetable';
 const CLASS_GROUPS_STORAGE_KEY = 'ttu_class_whatsapp_groups';
 const STUDENT_ARCHIVE_STORAGE_KEY = 'ttu_student_archive';
+const SUBMISSIONS_STORAGE_KEY = 'ttu_submissions';
+const COMMENTS_STORAGE_KEY = 'ttu_comments';
 const DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const ALL_CERTIFICATES = 'All Certificates';
 const ALL_YEARS = 'All Years';
@@ -295,6 +359,8 @@ export const DbProvider = ({ children }) => {
   const [timetable, setTimetable] = useState([]);
   const [classGroups, setClassGroups] = useState([]);
   const [studentArchive, setStudentArchive] = useState([]);
+  const [submissions, setSubmissions] = useState([]);
+  const [comments, setComments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [useApi, setUseApi] = useState(false); // true when backend is available
   const [canManageTestRoles, setCanManageTestRoles] = useState(false);
@@ -383,6 +449,16 @@ export const DbProvider = ({ children }) => {
     const sorted = [...data].sort((a, b) => (a.year || '').localeCompare(b.year || ''));
     setClassGroups(sorted);
     localStorage.setItem(CLASS_GROUPS_STORAGE_KEY, JSON.stringify(sorted));
+  };
+
+  const syncSubmissions = (data) => {
+    setSubmissions(data);
+    localStorage.setItem(SUBMISSIONS_STORAGE_KEY, JSON.stringify(data));
+  };
+
+  const syncComments = (data) => {
+    setComments(data);
+    localStorage.setItem(COMMENTS_STORAGE_KEY, JSON.stringify(data));
   };
 
   const getStudentArchive = (userId) => {
@@ -538,6 +614,20 @@ export const DbProvider = ({ children }) => {
         else {
           setClassGroups([]);
           localStorage.setItem(CLASS_GROUPS_STORAGE_KEY, JSON.stringify([]));
+        }
+
+        const localSubmissions = localStorage.getItem(SUBMISSIONS_STORAGE_KEY);
+        if (localSubmissions) setSubmissions(JSON.parse(localSubmissions));
+        else {
+          setSubmissions(initialSubmissions);
+          localStorage.setItem(SUBMISSIONS_STORAGE_KEY, JSON.stringify(initialSubmissions));
+        }
+
+        const localComments = localStorage.getItem(COMMENTS_STORAGE_KEY);
+        if (localComments) setComments(JSON.parse(localComments));
+        else {
+          setComments(initialComments);
+          localStorage.setItem(COMMENTS_STORAGE_KEY, JSON.stringify(initialComments));
         }
 
         if (localCurrentUser) setCurrentUser(localCurrentUser);
@@ -1244,6 +1334,126 @@ export const DbProvider = ({ children }) => {
     return { success: true };
   };
 
+  // ─── Student Assignment Submissions & Grading ──────────────────────────
+
+  const submitAssignment = async ({ deadlineId, file, link, notes }) => {
+    if (!currentUser) return { success: false, message: 'You must be signed in to submit.' };
+    
+    const deadline = deadlines.find(d => d.id === deadlineId);
+    const now = new Date();
+    const isLate = deadline ? now > new Date(deadline.dueDate + 'T23:59:59') : false;
+
+    const existingIndex = submissions.findIndex(s => s.deadlineId === deadlineId && s.studentId === currentUser.id);
+
+    const submissionPayload = {
+      id: existingIndex >= 0 ? submissions[existingIndex].id : `sub_${Date.now()}`,
+      deadlineId,
+      studentId: currentUser.id,
+      studentName: currentUser.name,
+      studentIndex: currentUser.indexNumber || currentUser.studentId || 'N/A',
+      studentYear: currentUser.year || 'Year 1',
+      studentCertificate: currentUser.certificate || 'BTech',
+      file: file !== undefined ? file : (existingIndex >= 0 ? submissions[existingIndex].file : null),
+      link: link !== undefined ? link : (existingIndex >= 0 ? submissions[existingIndex].link : ''),
+      notes: notes !== undefined ? notes : (existingIndex >= 0 ? submissions[existingIndex].notes : ''),
+      submittedAt: now.toISOString(),
+      isLate,
+      grade: existingIndex >= 0 ? submissions[existingIndex].grade : null,
+      feedback: existingIndex >= 0 ? submissions[existingIndex].feedback : null,
+      gradedAt: existingIndex >= 0 ? submissions[existingIndex].gradedAt : null,
+      gradedBy: existingIndex >= 0 ? submissions[existingIndex].gradedBy : null
+    };
+
+    let updated;
+    if (existingIndex >= 0) {
+      updated = [...submissions];
+      updated[existingIndex] = submissionPayload;
+    } else {
+      updated = [submissionPayload, ...submissions];
+    }
+
+    syncSubmissions(updated);
+    addNotification(`Your submission for "${deadline?.title || 'Assignment'}" was recorded successfully.`);
+    return { success: true, submission: submissionPayload };
+  };
+
+  const gradeSubmission = async (submissionId, { grade, feedback }) => {
+    const index = submissions.findIndex(s => s.id === submissionId);
+    if (index === -1) return { success: false, message: 'Submission not found' };
+
+    const targetSub = submissions[index];
+    const updatedSubmission = {
+      ...targetSub,
+      grade,
+      feedback,
+      gradedAt: new Date().toISOString(),
+      gradedBy: currentUser?.name || 'Lecturer'
+    };
+
+    const updated = [...submissions];
+    updated[index] = updatedSubmission;
+    syncSubmissions(updated);
+
+    addNotification(`Grade (${grade}) published for ${targetSub.studentName}.`);
+    return { success: true, submission: updatedSubmission };
+  };
+
+  const deleteSubmission = async (submissionId) => {
+    const updated = submissions.filter(s => s.id !== submissionId);
+    syncSubmissions(updated);
+    return { success: true };
+  };
+
+  // ─── Discussion Comments & Q&A ─────────────────────────────────────────
+
+  const addComment = async ({ parentId, parentType, text }) => {
+    if (!currentUser || !text?.trim()) return { success: false };
+    const newComment = {
+      id: `comm_${Date.now()}`,
+      parentId,
+      parentType, // 'announcement' or 'deadline'
+      authorId: currentUser.id,
+      authorName: currentUser.name,
+      authorRole: currentUser.role,
+      authorAvatar: currentUser.profilePic || '',
+      text: text.trim(),
+      createdAt: new Date().toISOString()
+    };
+    const updated = [...comments, newComment];
+    syncComments(updated);
+    return { success: true, comment: newComment };
+  };
+
+  const deleteComment = async (commentId) => {
+    const updated = comments.filter(c => c.id !== commentId);
+    syncComments(updated);
+    return { success: true };
+  };
+
+  // ─── User Profile Update ───────────────────────────────────────────────
+
+  const updateUserProfile = async (userId, profileData) => {
+    const targetId = userId || currentUser?.id;
+    if (!targetId) return { success: false, message: 'User not found' };
+
+    const updatedUsers = users.map(u => {
+      if (u.id === targetId) {
+        return { ...u, ...profileData };
+      }
+      return u;
+    });
+    syncUsers(updatedUsers);
+
+    if (currentUser?.id === targetId) {
+      const updatedCurrent = { ...currentUser, ...profileData };
+      setCurrentUser(updatedCurrent);
+      localStorage.setItem(CURRENT_USER_STORAGE_KEY, JSON.stringify(updatedCurrent));
+    }
+
+    addNotification('Profile details updated successfully.');
+    return { success: true };
+  };
+
   // ─── Context Value ────────────────────────────────────────────────────
 
   return (
@@ -1256,6 +1466,9 @@ export const DbProvider = ({ children }) => {
       notifications,
       timetable,
       classGroups,
+      studentArchive,
+      submissions,
+      comments,
       loading,
       canManageTestRoles,
       googleVerificationPending,
@@ -1268,7 +1481,6 @@ export const DbProvider = ({ children }) => {
       updateDeadline,
       deleteDeadline,
       toggleDeadlineCompleted,
-      studentArchive,
       archiveStudentWork,
       restoreStudentWork,
       addEvent,
@@ -1286,6 +1498,12 @@ export const DbProvider = ({ children }) => {
       provisionIdentity,
       provisionIdentities,
       updateUserProfilePic,
+      updateUserProfile,
+      submitAssignment,
+      gradeSubmission,
+      deleteSubmission,
+      addComment,
+      deleteComment,
       createRegistrationCode,
       listRegistrationCodes,
       revokeRegistrationCode,

@@ -1,6 +1,8 @@
 import React, { useContext, useState } from 'react';
 import { DbContext } from '../context/DbContextDefinition';
 import './LecturerDashboard.css';
+import LecturerSubmissionsModal from './LecturerSubmissionsModal';
+import DiscussionThread from './DiscussionThread';
 import {
   openWhatsApp,
   formatAnnouncementForWhatsApp,
@@ -25,12 +27,18 @@ export default function LecturerDashboard() {
     addDeadline, 
     deleteDeadline, 
     addAnnouncement, 
-    deleteAnnouncement 
+    deleteAnnouncement,
+    submissions,
+    gradeSubmission,
+    comments,
+    addComment,
+    deleteComment
   } = useContext(DbContext);
 
   // Forms State
   const [showDeadlineForm, setShowDeadlineForm] = useState(false);
   const [showAnnounceForm, setShowAnnounceForm] = useState(false);
+  const [selectedDeadlineForSubmissions, setSelectedDeadlineForSubmissions] = useState(null);
 
   // Deadline Fields
   const lecturerCourses = asCourseList(currentUser?.courses);
@@ -413,8 +421,40 @@ export default function LecturerDashboard() {
                       <div className="date-info mt-2">
                         <span>📅 Due: <strong>{d.dueDate}</strong></span>
                       </div>
+
+                      {/* Interactive Discussion / Q&A Thread */}
+                      <DiscussionThread
+                        parentId={d.id}
+                        parentType="deadline"
+                        comments={comments}
+                        currentUser={currentUser}
+                        onAddComment={addComment}
+                        onDeleteComment={deleteComment}
+                      />
                     </div>
                     <div className="item-card-actions" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      {/* View Student Submissions Button */}
+                      <button
+                        type="button"
+                        onClick={() => setSelectedDeadlineForSubmissions(d)}
+                        style={{
+                          background: 'rgba(59, 130, 246, 0.16)',
+                          border: '1px solid rgba(59, 130, 246, 0.4)',
+                          color: '#2563eb',
+                          padding: '6px 12px',
+                          borderRadius: '6px',
+                          fontSize: '11px',
+                          fontWeight: '700',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}
+                        title="Review student submitted assignments and enter grades"
+                      >
+                        📥 Submissions ({(submissions || []).filter(s => s.deadlineId === d.id).length})
+                      </button>
+
                       <button
                         type="button"
                         onClick={() => openWhatsApp({ text: formatDeadlineForWhatsApp(d) })}
@@ -486,6 +526,16 @@ export default function LecturerDashboard() {
                     <h3>{a.title} {a.isPinned && '📌'}</h3>
                     <div className="announcement-target">{a.certificate || 'All Certificates'} - {a.year || 'All Years'}</div>
                     <p>{a.content}</p>
+
+                    {/* Interactive Q&A for Notices */}
+                    <DiscussionThread
+                      parentId={a.id}
+                      parentType="announcement"
+                      comments={comments}
+                      currentUser={currentUser}
+                      onAddComment={addComment}
+                      onDeleteComment={deleteComment}
+                    />
                   </div>
                 ))
               )}
@@ -514,6 +564,16 @@ export default function LecturerDashboard() {
 
         </aside>
       </div>
+
+      {/* Lecturer Submissions Modal */}
+      {selectedDeadlineForSubmissions && (
+        <LecturerSubmissionsModal
+          deadline={selectedDeadlineForSubmissions}
+          submissions={submissions}
+          onGrade={gradeSubmission}
+          onClose={() => setSelectedDeadlineForSubmissions(null)}
+        />
+      )}
     </div>
   );
 }

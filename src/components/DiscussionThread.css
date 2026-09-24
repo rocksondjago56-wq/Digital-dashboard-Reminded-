@@ -1,0 +1,155 @@
+.discussion-thread-container {
+  margin-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 8px;
+}
+
+.discussion-toggle-btn {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  font-size: 0.8rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  padding: 4px 0;
+  transition: color 0.15s;
+}
+
+.discussion-toggle-btn:hover {
+  color: #f1f5f9;
+}
+
+.comment-count-chip {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 1px 7px;
+  border-radius: 9999px;
+  font-size: 0.72rem;
+  color: #cbd5e1;
+}
+
+.toggle-arrow {
+  font-size: 0.65rem;
+  opacity: 0.7;
+}
+
+.discussion-drawer {
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 8px;
+  padding: 10px;
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.comments-list {
+  max-height: 220px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.no-comments-text {
+  font-size: 0.78rem;
+  color: #64748b;
+  font-style: italic;
+  margin: 4px 0;
+}
+
+.comment-bubble {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  padding: 6px 10px;
+}
+
+.comment-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 3px;
+}
+
+.comment-author-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: #e2e8f0;
+}
+
+.comm-badge {
+  font-size: 0.65rem;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-weight: 700;
+}
+
+.comm-admin { background: rgba(239, 68, 68, 0.2); color: #fca5a5; }
+.comm-lecturer { background: rgba(59, 130, 246, 0.2); color: #93c5fd; }
+.comm-head { background: rgba(234, 179, 8, 0.2); color: #fde047; }
+.comm-student { background: rgba(148, 163, 184, 0.2); color: #cbd5e1; }
+
+.comment-meta-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.comment-date {
+  font-size: 0.68rem;
+  color: #64748b;
+}
+
+.comment-del-btn {
+  background: none;
+  border: none;
+  color: #ef4444;
+  font-size: 1rem;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0 2px;
+  opacity: 0.7;
+}
+
+.comment-del-btn:hover {
+  opacity: 1;
+}
+
+.comment-body {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #cbd5e1;
+  line-height: 1.35;
+}
+
+.new-comment-form {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.comment-input {
+  flex: 1;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  color: #f8fafc;
+  font-size: 0.8rem;
+}
+
+.comment-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.comment-submit-btn {
+  padding: 6px 12px;
+  font-size: 0.78rem;
+}

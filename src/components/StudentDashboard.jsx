@@ -1,6 +1,8 @@
 import React, { useContext, useEffect, useState } from 'react';
 import { DbContext } from '../context/DbContextDefinition';
 import './StudentDashboard.css';
+import SubmissionModal from './SubmissionModal';
+import DiscussionThread from './DiscussionThread';
 import {
   openWhatsApp,
   formatAnnouncementForWhatsApp,
@@ -37,12 +39,18 @@ export default function StudentDashboard() {
     addTimetableSlot,
     updateTimetableSlot,
     deleteTimetableSlot,
-    saveClassWhatsAppGroup
+    saveClassWhatsAppGroup,
+    submissions,
+    submitAssignment,
+    comments,
+    addComment,
+    deleteComment
   } = useContext(DbContext);
 
   const [activeTab, setActiveTab] = useState('all'); // all, assignments, projects, exams, completed, archive
   const [announcementFilter, setAnnouncementFilter] = useState('all'); // all, notice, update, calendar
   const [showTimetableForm, setShowTimetableForm] = useState(false);
+  const [submittingDeadline, setSubmittingDeadline] = useState(null);
   const [editingTimetableId, setEditingTimetableId] = useState(null);
   const [timetableForm, setTimetableForm] = useState({
     day: 'Monday',
@@ -431,7 +439,47 @@ export default function StudentDashboard() {
                           </div>
                         )}
 
-                        <div className="deadline-action-row" style={{ marginTop: '10px' }}>
+                        <div className="deadline-action-row" style={{ marginTop: '10px', display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                          {/* Student Assignment Work Submission Trigger */}
+                          {d.type !== 'examination' && (() => {
+                            const studentSub = (submissions || []).find(s => s.deadlineId === d.id && s.studentId === currentUser?.id);
+                            return (
+                              <button
+                                type="button"
+                                onClick={() => setSubmittingDeadline(d)}
+                                style={{
+                                  background: studentSub?.grade
+                                    ? 'rgba(234, 179, 8, 0.16)'
+                                    : studentSub
+                                      ? 'rgba(34, 197, 94, 0.16)'
+                                      : 'rgba(37, 99, 235, 0.16)',
+                                  border: studentSub?.grade
+                                    ? '1px solid rgba(234, 179, 8, 0.4)'
+                                    : studentSub
+                                      ? '1px solid rgba(34, 197, 94, 0.4)'
+                                      : '1px solid rgba(37, 99, 235, 0.4)',
+                                  color: studentSub?.grade ? '#ca8a04' : studentSub ? '#16a34a' : '#2563eb',
+                                  padding: '5px 12px',
+                                  borderRadius: '6px',
+                                  fontSize: '11.5px',
+                                  fontWeight: '700',
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '5px'
+                                }}
+                              >
+                                {studentSub?.grade ? (
+                                  <span>🏆 Grade: <strong>{studentSub.grade}</strong></span>
+                                ) : studentSub ? (
+                                  <span>✅ Submitted ({studentSub.isLate ? 'Late' : 'On Time'})</span>
+                                ) : (
+                                  <span>📤 Submit Work</span>
+                                )}
+                              </button>
+                            );
+                          })()}
+
                           <button
                             type="button"
                             onClick={() => handleShareDeadline(d)}
@@ -439,7 +487,7 @@ export default function StudentDashboard() {
                               background: 'rgba(37, 211, 102, 0.12)',
                               border: '1px solid rgba(37, 211, 102, 0.35)',
                               color: '#16a34a',
-                              padding: '4px 10px',
+                              padding: '5px 10px',
                               borderRadius: '6px',
                               fontSize: '11px',
                               fontWeight: '600',
@@ -449,10 +497,20 @@ export default function StudentDashboard() {
                               gap: '4px'
                             }}
                           >
-                            <span>💬 Share to WhatsApp</span>
+                            <span>💬 Share</span>
                           </button>
                           <button type="button" className="archive-work-btn" onClick={() => archiveStudentWork(d)}>Archive</button>
                         </div>
+
+                        {/* Interactive Discussion / Q&A Thread */}
+                        <DiscussionThread
+                          parentId={d.id}
+                          parentType="deadline"
+                          comments={comments}
+                          currentUser={currentUser}
+                          onAddComment={addComment}
+                          onDeleteComment={deleteComment}
+                        />
                       </div>
 
                       <div className="deadline-timing">
@@ -533,6 +591,16 @@ export default function StudentDashboard() {
                         <span>💬 Forward on WhatsApp</span>
                       </button>
                     </div>
+
+                    {/* Interactive Q&A for Notices */}
+                    <DiscussionThread
+                      parentId={a.id}
+                      parentType="announcement"
+                      comments={comments}
+                      currentUser={currentUser}
+                      onAddComment={addComment}
+                      onDeleteComment={deleteComment}
+                    />
                   </div>
                 ))
               )}
@@ -663,21 +731,31 @@ export default function StudentDashboard() {
           <section className="glass-panel sidebar-section">
             <div className="student-timetable-header">
               <h2>Your Weekly Classes</h2>
-              {canManageTimetable && (
+              <div style={{ display: 'flex', gap: '6px' }}>
                 <button
                   type="button"
-                  className="btn btn-primary btn-xs"
-                  onClick={() => {
-                    if (showTimetableForm) {
-                      resetTimetableForm();
-                    } else {
-                      setShowTimetableForm(true);
-                    }
-                  }}
+                  className="btn btn-secondary btn-xs"
+                  onClick={() => window.print()}
+                  title="Print your weekly class timetable or save as PDF"
                 >
-                  {showTimetableForm ? 'Cancel' : 'Add Class'}
+                  🖨️ Print
                 </button>
-              )}
+                {canManageTimetable && (
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-xs"
+                    onClick={() => {
+                      if (showTimetableForm) {
+                        resetTimetableForm();
+                      } else {
+                        setShowTimetableForm(true);
+                      }
+                    }}
+                  >
+                    {showTimetableForm ? 'Cancel' : 'Add Class'}
+                  </button>
+                )}
+              </div>
             </div>
 
             {canManageTimetable && showTimetableForm && (
@@ -759,6 +837,16 @@ export default function StudentDashboard() {
 
         </aside>
       </div>
+
+      {/* Submission Modal for Students */}
+      {submittingDeadline && (
+        <SubmissionModal
+          deadline={submittingDeadline}
+          existingSubmission={(submissions || []).find(s => s.deadlineId === submittingDeadline.id && s.studentId === currentUser?.id)}
+          onSubmit={submitAssignment}
+          onClose={() => setSubmittingDeadline(null)}
+        />
+      )}
     </div>
   );
 }

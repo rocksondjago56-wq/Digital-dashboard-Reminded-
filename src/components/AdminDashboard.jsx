@@ -2,6 +2,7 @@ import React, { useContext, useEffect, useState } from 'react';
 import * as XLSX from 'xlsx';
 import { DbContext } from '../context/DbContextDefinition';
 import './AdminDashboard.css';
+import DiscussionThread from './DiscussionThread';
 import {
   openWhatsApp,
   formatAnnouncementForWhatsApp,
@@ -39,7 +40,11 @@ export default function AdminDashboard() {
     revokeRegistrationCode,
     provisionIdentity,
     provisionIdentities,
-    deleteUser
+    deleteUser,
+    submissions,
+    comments,
+    addComment,
+    deleteComment
   } = useContext(DbContext);
 
   const [adminTab, setAdminTab] = useState('announcements'); // announcements, events, deadlines, timetable, whatsapp, users
@@ -72,6 +77,85 @@ export default function AdminDashboard() {
     const result = await revokeRegistrationCode(id);
     if (!result?.success) return setRegistrationCodeError(result?.message || 'Could not revoke the registration code.');
     setRegistrationCodes(codes => codes.map(code => code.id === id ? { ...code, revokedAt: result.code.revokedAt } : code));
+  };
+
+  // ─── Excel Reports Handlers ────────────────────────────────────────────
+
+  const handleExportStudentsExcel = () => {
+    const students = users.filter(u => ['student', 'student_head'].includes(u.role));
+    if (!students.length) {
+      alert('No student records found to export.');
+      return;
+    }
+    const rows = students.map((s, idx) => ({
+      'No.': idx + 1,
+      'Full Name': s.name,
+      'Index Number / Student ID': s.studentId || s.indexNumber || 'N/A',
+      'Email Address': s.email,
+      'Phone': s.phone || 'N/A',
+      'Programme': s.certificate || 'BTech',
+      'Year Group': s.year || 'Year 1',
+      'Department': s.department || 'Graphic Design',
+      'Role': s.role === 'student_head' ? 'Class Head' : 'Student'
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Students');
+    XLSX.writeFile(wb, 'TTU_Graphic_Design_Students_Directory.xlsx');
+  };
+
+  const handleExportStaffExcel = () => {
+    const staff = users.filter(u => ['admin', 'lecturer'].includes(u.role));
+    if (!staff.length) {
+      alert('No staff records found to export.');
+      return;
+    }
+    const rows = staff.map((s, idx) => ({
+      'No.': idx + 1,
+      'Full Name': s.name,
+      'Staff ID': s.staffId || 'N/A',
+      'Email Address': s.email,
+      'Phone': s.phone || 'N/A',
+      'Designation / Position': s.designation || (s.role === 'admin' ? 'Administrator' : 'Lecturer'),
+      'Assigned Courses': Array.isArray(s.courses) ? s.courses.join(', ') : (s.courses || 'N/A'),
+      'Department': s.department || 'Graphic Design',
+      'Role': s.role.toUpperCase()
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Staff');
+    XLSX.writeFile(wb, 'TTU_Graphic_Design_Staff_Directory.xlsx');
+  };
+
+  const handleExportSubmissionsExcel = () => {
+    if (!submissions?.length) {
+      alert('No student submissions found to export.');
+      return;
+    }
+    const rows = submissions.map((s, idx) => {
+      const d = (deadlines || []).find(dl => dl.id === s.deadlineId);
+      return {
+        'No.': idx + 1,
+        'Course': d?.course || 'Graphic Design',
+        'Assignment Title': d?.title || 'Assignment',
+        'Student Name': s.studentName,
+        'Index Number': s.studentIndex,
+        'Programme': s.studentCertificate,
+        'Year Group': s.studentYear,
+        'Submitted At': new Date(s.submittedAt).toLocaleString(),
+        'On Time / Late': s.isLate ? 'Late' : 'On Time',
+        'Awarded Grade': s.grade || 'Ungraded',
+        'Lecturer Feedback': s.feedback || '',
+        'Graded By': s.gradedBy || 'N/A'
+      };
+    });
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Submissions');
+    XLSX.writeFile(wb, 'TTU_Graphic_Design_Submissions_Report.xlsx');
   };
 
   // Form toggles
@@ -585,6 +669,17 @@ export default function AdminDashboard() {
                     </button>
                     <button onClick={() => deleteAnnouncement(a.id)} className="btn-icon-danger">Remove</button>
                   </div>
+                  {/* Discussion Thread for Announcements */}
+                  <div style={{ width: '100%', marginTop: '6px' }}>
+                    <DiscussionThread
+                      parentId={a.id}
+                      parentType="announcement"
+                      comments={comments}
+                      currentUser={currentUser}
+                      onAddComment={addComment}
+                      onDeleteComment={deleteComment}
+                    />
+                  </div>
                 </div>
               ))}
             </div>
@@ -797,6 +892,17 @@ export default function AdminDashboard() {
                       📲 WhatsApp
                     </button>
                     <button onClick={() => deleteDeadline(d.id)} className="btn-icon-danger">Remove</button>
+                  </div>
+                  {/* Discussion Thread for Deadlines */}
+                  <div style={{ width: '100%', marginTop: '6px' }}>
+                    <DiscussionThread
+                      parentId={d.id}
+                      parentType="deadline"
+                      comments={comments}
+                      currentUser={currentUser}
+                      onAddComment={addComment}
+                      onDeleteComment={deleteComment}
+                    />
                   </div>
                 </div>
               ))}
@@ -1011,7 +1117,47 @@ export default function AdminDashboard() {
         {adminTab === 'users' && (
           <div>
             <div className="tab-actions-row">
-              <h3>Member Registration & Role Permissions</h3>
+              <h3>Member Registration &amp; Role Permissions</h3>
+            </div>
+
+            {/* Department Excel Exports Toolbar */}
+            <div style={{
+              display: 'flex',
+              gap: '10px',
+              flexWrap: 'wrap',
+              marginBottom: '16px',
+              padding: '12px 14px',
+              background: 'rgba(255, 255, 255, 0.03)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: '10px'
+            }}>
+              <span style={{ fontSize: '13px', fontWeight: 600, color: '#94a3b8', display: 'flex', alignItems: 'center' }}>
+                📁 Export Reports:
+              </span>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={handleExportStudentsExcel}
+                style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#047857', border: '1px solid rgba(16, 185, 129, 0.3)' }}
+              >
+                📊 Export Students (.xlsx)
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={handleExportStaffExcel}
+                style={{ background: 'rgba(59, 130, 246, 0.15)', color: '#1d4ed8', border: '1px solid rgba(59, 130, 246, 0.3)' }}
+              >
+                📊 Export Staff Directory (.xlsx)
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={handleExportSubmissionsExcel}
+                style={{ background: 'rgba(234, 179, 8, 0.15)', color: '#854d0e', border: '1px solid rgba(234, 179, 8, 0.3)' }}
+              >
+                📊 Export All Submissions (.xlsx)
+              </button>
             </div>
             <p className="admin-form-status">Demo Mode Enabled. Remove before production deployment.</p>
             <form className="admin-action-form" onSubmit={handleRegistrationCode}>

@@ -3,14 +3,38 @@ import { DbContext } from '../context/DbContextDefinition';
 import './Navbar.css';
 import ttuLogo from '../ttu-logo.png.png';
 import { openWhatsApp, getWhatsAppConfig } from '../utils/whatsapp';
+import GlobalSearchModal from './GlobalSearchModal';
+import CalendarView from './CalendarView';
+import ProfileSettingsModal from './ProfileSettingsModal';
+import GpaCalculatorModal from './GpaCalculatorModal';
 
 export default function Navbar() {
-  const { currentUser, logout, notifications, markAllNotificationsAsRead, updateUserProfilePic, deleteUser } = useContext(DbContext);
+  const {
+    currentUser,
+    logout,
+    notifications,
+    markAllNotificationsAsRead,
+    updateUserProfilePic,
+    updateUserProfile,
+    deleteUser,
+    deadlines,
+    announcements,
+    events,
+    timetable
+  } = useContext(DbContext);
+
   const [showNotifications, setShowNotifications] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeletingSelf, setIsDeletingSelf] = useState(false);
   const [avatarError, setAvatarError] = useState('');
   const [isUpdatingAvatar, setIsUpdatingAvatar] = useState(false);
+
+  // New Modals State
+  const [showSearchModal, setShowSearchModal] = useState(false);
+  const [showCalendarModal, setShowCalendarModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showGpaModal, setShowGpaModal] = useState(false);
+
   const dropdownRef = useRef(null);
   const fileInputRef = useRef(null);
 
@@ -23,6 +47,18 @@ export default function Navbar() {
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Keyboard shortcut: Ctrl+K or Cmd+K to open global search
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setShowSearchModal(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   if (!currentUser) return null;
@@ -117,6 +153,8 @@ export default function Navbar() {
     return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   };
 
+  const isStudent = ['student', 'student_head'].includes(currentUser?.role);
+
   return (
     <nav className="navbar-container glass-panel">
       <div className="navbar-left">
@@ -124,9 +162,54 @@ export default function Navbar() {
           <img src={ttuLogo} alt="TTU Logo" className="navbar-logo-img" />
           <span className="logo-department">Graphic Design Dept</span>
         </div>
+
+        {/* Global Search Button */}
+        <button
+          type="button"
+          className="navbar-search-trigger desktop-only"
+          onClick={() => setShowSearchModal(true)}
+          title="Search anything across portal (Ctrl + K)"
+        >
+          <span>🔍</span>
+          <span className="search-placeholder-text">Quick Search...</span>
+          <span className="search-shortcut-badge">Ctrl K</span>
+        </button>
       </div>
 
       <div className="navbar-right">
+        {/* Mobile Search Icon */}
+        <button
+          type="button"
+          className="navbar-icon-btn mobile-only"
+          onClick={() => setShowSearchModal(true)}
+          title="Search"
+          aria-label="Search"
+        >
+          <span>🔍</span>
+        </button>
+
+        {/* Calendar Button */}
+        <button
+          type="button"
+          className="navbar-text-btn"
+          onClick={() => setShowCalendarModal(true)}
+          title="Open interactive monthly academic calendar & export .ics"
+        >
+          <span>📅</span> <span className="desktop-only">Calendar</span>
+        </button>
+
+        {/* GPA Calculator Button (for students) */}
+        {isStudent && (
+          <button
+            type="button"
+            className="navbar-text-btn gpa-btn"
+            onClick={() => setShowGpaModal(true)}
+            title="Calculate projected semester GPA and classification"
+          >
+            <span>🧮</span> <span className="desktop-only">GPA Calc</span>
+          </button>
+        )}
+
         <input 
           type="file" 
           ref={fileInputRef} 
@@ -134,8 +217,19 @@ export default function Navbar() {
           accept="image/*" 
           onChange={handleFileChange} 
         />
-        <div className="user-profile-widget" onClick={handleAvatarClick} title="Click to change profile picture">
-          <div className={`user-avatar clickable-avatar ${isUpdatingAvatar ? 'is-uploading' : ''}`}>
+        <div
+          className="user-profile-widget"
+          onClick={() => setShowSettingsModal(true)}
+          title="Click to view profile and settings"
+        >
+          <div
+            className={`user-avatar clickable-avatar ${isUpdatingAvatar ? 'is-uploading' : ''}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleAvatarClick();
+            }}
+            title="Click to update photo"
+          >
             {isUpdatingAvatar ? (
               <span className="avatar-uploading">...</span>
             ) : avatarSrc ? (
@@ -153,6 +247,17 @@ export default function Navbar() {
           </div>
           {avatarError && <span className="avatar-error-message">{avatarError}</span>}
         </div>
+
+        {/* Settings Button */}
+        <button
+          type="button"
+          className="navbar-icon-btn"
+          onClick={() => setShowSettingsModal(true)}
+          title="Account & Security Settings"
+          aria-label="Settings"
+        >
+          <span>⚙️</span>
+        </button>
 
         {/* WhatsApp Desk Button */}
         <button
@@ -220,6 +325,43 @@ export default function Navbar() {
           <span>🚪</span> <span className="desktop-only">Sign Out</span>
         </button>
       </div>
+
+      {/* Global Search Modal */}
+      {showSearchModal && (
+        <GlobalSearchModal
+          deadlines={deadlines}
+          announcements={announcements}
+          events={events}
+          timetable={timetable}
+          onClose={() => setShowSearchModal(false)}
+        />
+      )}
+
+      {/* Calendar View Modal */}
+      {showCalendarModal && (
+        <CalendarView
+          deadlines={deadlines}
+          events={events}
+          timetable={timetable}
+          onClose={() => setShowCalendarModal(false)}
+        />
+      )}
+
+      {/* Profile & Security Settings Modal */}
+      {showSettingsModal && (
+        <ProfileSettingsModal
+          currentUser={currentUser}
+          onUpdateProfile={updateUserProfile}
+          onClose={() => setShowSettingsModal(false)}
+        />
+      )}
+
+      {/* GPA Calculator Modal */}
+      {showGpaModal && (
+        <GpaCalculatorModal
+          onClose={() => setShowGpaModal(false)}
+        />
+      )}
 
       {/* Delete Account Confirmation Modal */}
       {showDeleteModal && (
