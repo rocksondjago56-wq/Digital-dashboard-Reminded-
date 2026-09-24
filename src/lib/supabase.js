@@ -3,7 +3,9 @@ import { createClient } from '@supabase/supabase-js';
 // Supabase publishable keys are safe to expose in browser code. Environment
 // variables remain preferred, while these fallbacks keep deployed builds usable.
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://htxbrxxtchomuhshdqtw.supabase.co';
-const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_InT6fS6X6aZ33A383GxhBQ_Mn88-aO3';
+const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
+  || import.meta.env.VITE_SUPABASE_ANON_KEY
+  || 'sb_publishable_InT6fS6X6aZ33A383GxhBQ_Mn88-aO3';
 
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseKey);
 
@@ -110,4 +112,33 @@ export async function signOutOfGoogle() {
       // ignore sign-out errors
     }
   }
+}
+
+export async function sendPasswordReset(email) {
+  if (!supabase) throw new Error('Supabase authentication is not configured.');
+  const trimmed = String(email || '').trim();
+  if (!trimmed) throw new Error('Please enter a valid email address.');
+
+  const redirectUrl = (typeof window !== 'undefined' && window.location?.origin)
+    ? `${window.location.origin}/`
+    : `${LIVE_PORTAL_URL}/`;
+
+  const { data, error } = await supabase.auth.resetPasswordForEmail(trimmed, {
+    redirectTo: redirectUrl
+  });
+  if (error) throw error;
+  return data;
+}
+
+export async function updateUserPassword(newPassword) {
+  if (!supabase) throw new Error('Supabase authentication is not configured.');
+  if (!newPassword || newPassword.length < 6) {
+    throw new Error('Password must be at least 6 characters long.');
+  }
+
+  const { data, error } = await supabase.auth.updateUser({
+    password: newPassword
+  });
+  if (error) throw error;
+  return data;
 }

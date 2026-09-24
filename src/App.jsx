@@ -6,6 +6,7 @@ import StudentDashboard from './components/StudentDashboard';
 import LecturerDashboard from './components/LecturerDashboard';
 import AdminDashboard from './components/AdminDashboard';
 import WhatsAppWidget from './components/WhatsAppWidget';
+import PWAInstallPrompt from './components/PWAInstallPrompt';
 
 const DASHBOARD_BY_ROLE = {
   student: 'Student Dashboard',
@@ -78,12 +79,18 @@ export default function App() {
     );
   }
 
-  // If user is not authenticated, show Login Screen
-  if (!currentUser || googleVerificationPending) {
+  const isPasswordRecovery = typeof window !== 'undefined' && (
+    window.location.hash.includes('type=recovery') ||
+    window.location.search.includes('type=recovery')
+  );
+
+  // If user is not authenticated or recovering password, show Login Screen
+  if (!currentUser || googleVerificationPending || isPasswordRecovery) {
     return (
       <>
-        <Login />
+        <Login isPasswordRecovery={isPasswordRecovery} />
         <WhatsAppWidget />
+        <PWAInstallPrompt />
       </>
     );
   }
@@ -108,6 +115,7 @@ export default function App() {
       {currentUser.role === 'lecturer' && <LecturerDashboard />}
       {(currentUser.role === 'student' || currentUser.role === 'student_head') && <StudentDashboard />}
       <WhatsAppWidget />
+      <PWAInstallPrompt />
     </>
   );
 }

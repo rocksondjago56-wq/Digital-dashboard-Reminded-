@@ -2,22 +2,11 @@ import React, { useContext, useEffect, useRef, useState } from 'react';
 import { DbContext } from '../context/DbContextDefinition';
 import './Login.css';
 import ttuLogo from '../ttu-logo.png.png';
-import { getSupabaseSession, saveSupabaseProfile, signInWithEmailPassword, signInWithGoogle, signUpWithEmailPassword, signOutOfGoogle } from '../lib/supabase';
+import { getSupabaseSession, saveSupabaseProfile, signInWithEmailPassword, signInWithGoogle, signUpWithEmailPassword, signOutOfGoogle, sendPasswordReset, updateUserPassword, supabase } from '../lib/supabase';
 
 const EMPTY_PROFILE = { role: 'student', fullName: '', indexNumber: '', email: '', password: '', program: '', certificate: 'BTech', year: 'Year 1', lecturerId: '', phone: '', department: 'Graphic Design', courses: [], position: 'Department Administrator', accessCode: '' };
 
-async function sendPasswordReset(email) {
-  const { createClient } = await import('@supabase/supabase-js');
-  const supabase = createClient(
-    import.meta.env.VITE_SUPABASE_URL,
-    import.meta.env.VITE_SUPABASE_ANON_KEY
-  );
-  return supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: window.location.origin
-  });
-}
-
-export default function Login() {
+export default function Login({ isPasswordRecovery: initialPasswordRecovery = false }) {
   const { login, googleSignIn, googleVerificationPending, confirmGoogleVerification, passwordPortalSignIn } = useContext(DbContext);
   const [isRegistering, setIsRegistering] = useState(false);
   const [showEmailSignIn, setShowEmailSignIn] = useState(false);
@@ -28,6 +17,17 @@ export default function Login() {
   const [notice, setNotice] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [forgotPasswordSent, setForgotPasswordSent] = useState(false);
+  const [isResettingPassword, setIsResettingPassword] = useState(() => {
+    if (initialPasswordRecovery) return true;
+    if (typeof window !== 'undefined') {
+      const hash = window.location.hash || '';
+      const search = window.location.search || '';
+      return hash.includes('type=recovery') || search.includes('type=recovery');
+    }
+    return false;
+  });
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const handledGoogleSession = useRef(false);
 
   const updateProfile = (field, value) => setProfile(current => ({ ...current, [field]: value }));
@@ -55,6 +55,32 @@ export default function Login() {
       setError(urlError);
       signOutOfGoogle().catch(() => {});
       return;
+    }
+
+    // 2. Listen for Supabase PASSWORD_RECOVERY event
+    let authListener = null;
+    if (supabase) {
+      const { data } = supabase.auth.onAuthStateChange((event, session) => {
+        if (event === 'PASSWORD_RECOVERY') {
+          setIsResettingPassword(true);
+          setShowEmailSignIn(true);
+          setError('');
+          if (session?.user?.email) {
+            setEmail(session.user.email);
+          }
+        }
+      });
+      authListener = data;
+    }
+
+    const isRecovery = (typeof window !== 'undefined') && (
+      window.location.hash.includes('type=recovery') ||
+      window.location.search.includes('type=recovery')
+    );
+    if (isRecovery || isResettingPassword) {
+      return () => {
+        authListener?.subscription?.unsubscribe();
+      };
     }
 
     const restoreGoogleSession = async () => {
@@ -108,7 +134,11 @@ export default function Login() {
       signOutOfGoogle().catch(() => {});
       setIsSubmitting(false);
     });
-  }, [googleSignIn, googleVerificationPending]);
+
+    return () => {
+      authListener?.subscription?.unsubscribe();
+    };
+  }, [googleSignIn, googleVerificationPending, isResettingPassword]);
 
   const handlePasswordSubmit = async (event) => {
     event.preventDefault();
@@ -196,13 +226,51 @@ export default function Login() {
     }
     setIsSubmitting(true);
     setError('');
+    setNotice('');
     try {
-      const { error: resetError } = await sendPasswordReset(trimmedEmail);
-      if (resetError) throw resetError;
+      await sendPasswordReset(trimmedEmail);
       setForgotPasswordSent(true);
-      setNotice(`Password reset link sent to ${trimmedEmail}. Check your inbox.`);
+      setNotice(`Password reset link sent to ${trimmedEmail}! Check your inbox and spam folder.`);
     } catch (resetErr) {
-      setError(resetErr?.message || 'Could not send password reset email. Please try again.');
+      console.error('[TTU Auth] Forgot password error:', resetErr);
+      const msg = resetErr?.message || '';
+      if (msg.toLowerCase().includes('rate limit')) {
+        setError('Too many reset requests sent. Please wait a few minutes before trying again.');
+      } else {
+        setError(msg || 'Could not send password reset email. Please try again.');
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleUpdatePasswordSubmit = async (event) => {
+    event.preventDefault();
+    setError('');
+    setNotice('');
+
+    if (!newPassword || newPassword.length < 6) {
+      setError('Password must be at least 6 characters long.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError('Passwords do not match. Please ensure both fields are identical.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await updateUserPassword(newPassword);
+      await signOutOfGoogle().catch(() => {});
+      window.history.replaceState(null, '', window.location.pathname);
+      setIsResettingPassword(false);
+      setNewPassword('');
+      setConfirmPassword('');
+      setShowEmailSignIn(true);
+      setNotice('Password updated successfully! Please sign in with your new password.');
+    } catch (updateErr) {
+      console.error('[TTU Auth] Password update failed:', updateErr);
+      setError(updateErr?.message || 'Could not update your password. The reset link may have expired.');
     } finally {
       setIsSubmitting(false);
     }
@@ -219,16 +287,63 @@ export default function Login() {
           <div className="ttu-logo-sim">
             <img src={ttuLogo} alt="Takoradi Technical University Logo" className="ttu-logo-img" />
           </div>
-          <h1>{isRegistering ? 'Create Your Account' : 'Welcome Back'}</h1>
+          <h1>{isResettingPassword ? 'Reset Your Password' : isRegistering ? 'Create Your Account' : 'Welcome Back'}</h1>
           <p className="subtitle">
-            {isRegistering ? 'Set up your TTU Design Hub portal account.' : 'Sign in to your academic workspace.'}
+            {isResettingPassword
+              ? 'Enter your new password below to secure your TTU portal account.'
+              : isRegistering
+                ? 'Set up your TTU Design Hub portal account.'
+                : 'Sign in to your academic workspace.'}
           </p>
         </div>
 
         {error && <div className="login-error-alert"><span>{error}</span></div>}
         {notice && <div className="login-success-alert"><span>{notice}</span></div>}
 
-        {!isRegistering ? (
+        {isResettingPassword ? (
+          <form className="email-signin-section animate-fade-in" onSubmit={handleUpdatePasswordSubmit}>
+            <div className="form-group">
+              <label htmlFor="reset-new-password">New Password</label>
+              <input
+                id="reset-new-password"
+                type="password"
+                value={newPassword}
+                onChange={e => setNewPassword(e.target.value)}
+                autoComplete="new-password"
+                placeholder="At least 6 characters"
+                minLength={6}
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="reset-confirm-password">Confirm New Password</label>
+              <input
+                id="reset-confirm-password"
+                type="password"
+                value={confirmPassword}
+                onChange={e => setConfirmPassword(e.target.value)}
+                autoComplete="new-password"
+                placeholder="Re-enter your new password"
+                minLength={6}
+                required
+              />
+            </div>
+            <button type="submit" className="btn btn-primary w-full" disabled={isSubmitting}>
+              {isSubmitting ? 'Updating Password...' : 'Save New Password'}
+            </button>
+            <button
+              type="button"
+              className="btn btn-outline-secondary w-full"
+              style={{ marginTop: '10px' }}
+              onClick={() => {
+                setIsResettingPassword(false);
+                window.history.replaceState(null, '', window.location.pathname);
+              }}
+            >
+              Cancel &amp; Back to Sign In
+            </button>
+          </form>
+        ) : !isRegistering ? (
           <div className="google-hero-signin">
             <div className="google-large-logo-wrap">
               <svg className="google-large-icon" width="56" height="56" viewBox="0 0 24 24" aria-hidden="true">
@@ -372,19 +487,21 @@ export default function Login() {
           </>
         )}
 
-        <div className="switch-mode-text">
-          <button
-            type="button"
-            className="text-link"
-            onClick={() => {
-              setIsRegistering(value => !value);
-              setError('');
-              setNotice('');
-            }}
-          >
-            {isRegistering ? 'Already registered? Sign in' : 'New to TTU Design Hub? Register your profile'}
-          </button>
-        </div>
+        {!isResettingPassword && (
+          <div className="switch-mode-text">
+            <button
+              type="button"
+              className="text-link"
+              onClick={() => {
+                setIsRegistering(value => !value);
+                setError('');
+                setNotice('');
+              }}
+            >
+              {isRegistering ? 'Already registered? Sign in' : 'New to TTU Design Hub? Register your profile'}
+            </button>
+          </div>
+        )}
 
         <div className="login-footer">
           <p>Copyright 2026 Takoradi Technical University</p>

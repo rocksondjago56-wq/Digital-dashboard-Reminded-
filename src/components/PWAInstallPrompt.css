@@ -1,0 +1,161 @@
+.pwa-install-banner {
+  position: fixed;
+  bottom: 84px;
+  right: 20px;
+  max-width: 380px;
+  width: calc(100% - 40px);
+  background: rgba(11, 21, 40, 0.92);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 179, 0, 0.35);
+  border-radius: 16px;
+  padding: 14px 16px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45), 0 0 20px rgba(255, 179, 0, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  z-index: 999;
+  animation: pwaSlideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  color: #ffffff;
+  font-family: 'Outfit', sans-serif;
+}
+
+@keyframes pwaSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(24px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.pwa-banner-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.pwa-app-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  object-fit: cover;
+  background: #ffffff;
+  padding: 2px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  flex-shrink: 0;
+}
+
+.pwa-banner-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.pwa-banner-title {
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pwa-banner-subtitle {
+  font-size: 0.78rem;
+  color: #94a3b8;
+  line-height: 1.25;
+}
+
+.pwa-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.pwa-install-btn {
+  background: linear-gradient(135deg, #ffb300 0%, #ff8f00 100%);
+  color: #0b1528;
+  font-weight: 700;
+  font-size: 0.84rem;
+  padding: 8px 14px;
+  border: none;
+  border-radius: 9999px;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(255, 179, 0, 0.35);
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.pwa-install-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(255, 179, 0, 0.5);
+  background: linear-gradient(135deg, #ffc107 0%, #ffa000 100%);
+}
+
+.pwa-dismiss-btn {
+  background: transparent;
+  border: none;
+  color: #64748b;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 1.1rem;
+  transition: all 0.2s ease;
+  padding: 0;
+}
+
+.pwa-dismiss-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+/* iOS instructions sheet / bubble */
+.pwa-ios-instructions {
+  font-size: 0.76rem;
+  color: #e2e8f0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pwa-ios-share-icon {
+  display: inline-flex;
+  vertical-align: middle;
+  color: #38bdf8;
+}
+
+@media (max-width: 480px) {
+  .pwa-install-banner {
+    bottom: 80px;
+    right: 12px;
+    left: 12px;
+    width: auto;
+    max-width: none;
+    padding: 10px 12px;
+  }
+
+  .pwa-banner-title {
+    font-size: 0.88rem;
+  }
+
+  .pwa-banner-subtitle {
+    font-size: 0.74rem;
+  }
+
+  .pwa-install-btn {
+    padding: 7px 12px;
+    font-size: 0.8rem;
+  }
+}
