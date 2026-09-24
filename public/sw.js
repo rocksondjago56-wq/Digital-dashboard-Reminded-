@@ -1,8 +1,9 @@
-const CACHE_NAME = 'ttu-hub-v1';
+const CACHE_NAME = 'ttu-hub-v2';
 const PRECACHE_ASSETS = [
   '/',
   '/index.html',
   '/manifest.webmanifest',
+  '/ttu-logo.png',
   '/icons/pwa-192x192.png',
   '/icons/pwa-512x512.png',
   '/icons/apple-touch-icon-180x180.png',
