@@ -411,41 +411,6 @@ export default function Login({ isPasswordRecovery: initialPasswordRecovery = fa
                     Forgot Password?
                   </button>
                 )}
-                <div className="demo-accounts-helper">
-                  <span className="demo-accounts-label">Demo accounts:</span>
-                  <div className="demo-chips">
-                    <button
-                      type="button"
-                      className="demo-chip"
-                      onClick={() => {
-                        setEmail('admin@ttu.edu.gh');
-                        setPassword('admin123');
-                      }}
-                    >
-                      👑 Admin
-                    </button>
-                    <button
-                      type="button"
-                      className="demo-chip"
-                      onClick={() => {
-                        setEmail('lecturer@ttu.edu.gh');
-                        setPassword('lecturer123');
-                      }}
-                    >
-                      👨‍🏫 Lecturer
-                    </button>
-                    <button
-                      type="button"
-                      className="demo-chip"
-                      onClick={() => {
-                        setEmail('student@ttu.edu.gh');
-                        setPassword('student123');
-                      }}
-                    >
-                      🎓 Student
-                    </button>
-                  </div>
-                </div>
               </form>
             ) : (
               <button
